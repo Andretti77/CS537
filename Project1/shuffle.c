@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 int main(int argc, char *argv[]){
 
     FILE* in_file;
@@ -8,26 +9,47 @@ int main(int argc, char *argv[]){
 
     in_file = fopen(argv[2],"r");
     out_file = fopen(argv[4], "w");
-
+    
     char  word[512];
-    char  words[300];
-    char* ptrs_to_words[300];
-    //char* last_word;
-    //int line_length;
-   // unsigned long int len;
+    char*  words;
+    char** ptrs_to_words;
+    int* char_per_line;
     int num_lines;
     int char_num;
     int j;
-    //int k;
+    int file_size;
+    struct stat in_file_info;
+    int curr_line;
     num_lines =0;
     char_num = 0;
     	    
 
+    fstat(fileno(in_file), &in_file_info);
+
+    file_size = in_file_info.st_size;
     
-	   
-    fread(words, sizeof(char), 512, in_file);	    
-	
-    for(j=0; j<sizeof(words); j++){
+    words = (char*)malloc(sizeof(char)*512);	   
+    fread(words, sizeof(char), file_size, in_file);	    
+   
+    int k=0;
+    while(words[k]!='\0'){
+
+	if(words[k]=='\n'){
+	num_lines++;
+
+	}
+
+
+	k++;
+
+    }
+
+    ptrs_to_words = (char**)malloc(sizeof(char*)*num_lines);
+    char_per_line = (int*)malloc(sizeof(int)*num_lines);
+    
+    j=0;
+    curr_line=0;
+    while(words[j] != '\0'){
 
 	if(words[j] !='\n'){
 	 
@@ -39,15 +61,18 @@ int main(int argc, char *argv[]){
 
 	}else{
 	 	
+	 
 	 word[char_num] = words[j];
-
-	 //printf("%s", word);	 
-    	 ptrs_to_words[num_lines] = strdup(word);
-	 //printf("%s", ptrs_to_words[num_lines]);
+	 char_num++;
+	 	 
+    	 ptrs_to_words[curr_line] = strdup(word);
+	 char_per_line[curr_line] = char_num;
+	
 	 char_num = 0;
-	 num_lines++;
+	 curr_line++;
 
-	}  
+	} 
+       j++;	
 
     }
 
@@ -61,19 +86,21 @@ int main(int argc, char *argv[]){
 
  	 
   
-   //fwrite(ptrs_to_words[0], sizeof(char)*512, 1, out_file);
+   
    for(j=0; j<num_lines/2; j++){
-	printf("%s", ptrs_to_words[0]); 
+	   
+	fwrite(ptrs_to_words[j],sizeof(char),char_per_line[j], out_file);
 
-	fwrite(ptrs_to_words[j],sizeof(char),512, out_file);
-	fwrite(ptrs_to_words[num_lines-j-1],sizeof(char), 512 , out_file);	
+	fwrite(ptrs_to_words[num_lines-j-1],sizeof(char), char_per_line[num_lines-j-1] , out_file);	
 
 
    }	
 
- //  }
 
-    
+
+    free(ptrs_to_words);
+    free(char_per_line);
+    free(words);
     fclose(in_file);
     fclose(out_file);
     return 0;

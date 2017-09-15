@@ -87,7 +87,12 @@ int main(int argc, char *argv[]){
  	 
   
    
-   for(j=0; j<num_lines/2; j++){
+   for(j=0; j<num_lines; j++){
+	if(ptrs_to_words[j] == ptrs_to_words[num_lines-j-1]){
+		fwrite(ptrs_to_words[j], sizeof(char), char_per_line[j], out_file);
+		break;
+	
+	}	
 	   
 	fwrite(ptrs_to_words[j],sizeof(char),char_per_line[j], out_file);
 

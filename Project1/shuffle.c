@@ -6,11 +6,26 @@ int main(int argc, char *argv[]){
 
     FILE* in_file;
     FILE* out_file;
-
-    in_file = fopen(argv[2],"r");
-    out_file = fopen(argv[4], "w");
+  
     
-    char  word[512];
+
+    if(strcmp(argv[1],"-i")==0){
+
+       in_file = fopen(argv[2],"r");
+       out_file = fopen(argv[4], "w");
+
+    }else if(strcmp(argv[1],"-o")==0 ){
+
+	in_file = fopen(argv[4], "r");
+	out_file = fopen(argv[2], "w");
+
+    }else{
+	printf("Format: -i <inputfile> -o <outputfile>");
+	return 0;
+
+    }
+
+    char*  word;
     char*  words;
     char** ptrs_to_words;
     int* char_per_line;
@@ -46,7 +61,7 @@ int main(int argc, char *argv[]){
 
     ptrs_to_words = (char**)malloc(sizeof(char*)*num_lines);
     char_per_line = (int*)malloc(sizeof(int)*num_lines);
-    
+    word = (char*)malloc(sizeof(char)*512);
     j=0;
     curr_line=0;
     while(words[j] != '\0'){
@@ -65,11 +80,12 @@ int main(int argc, char *argv[]){
 	 word[char_num] = words[j];
 	 char_num++;
 	 	 
-    	 ptrs_to_words[curr_line] = strdup(word);
+    	 ptrs_to_words[curr_line] = word;
 	 char_per_line[curr_line] = char_num;
 	
 	 char_num = 0;
 	 curr_line++;
+	 word = (char*)malloc(sizeof(char)*512);
 
 	} 
        j++;	
@@ -104,6 +120,7 @@ int main(int argc, char *argv[]){
 
 
     free(ptrs_to_words);
+    free(word);
     free(char_per_line);
     free(words);
     fclose(in_file);

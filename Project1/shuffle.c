@@ -4,6 +4,10 @@
 #include <sys/stat.h>
 int main(int argc, char *argv[]){
 
+
+    if(argc >5){
+	printf("Usage: -i <inputfile> -o <outputfile>\n");
+    }	    
     FILE* in_file;
     FILE* out_file;
   
@@ -12,16 +16,30 @@ int main(int argc, char *argv[]){
     if(strcmp(argv[1],"-i")==0){
 
        in_file = fopen(argv[2],"r");
+       if(in_file == NULL){
+	       fprintf(stderr, "Error opening %s\n", argv[2]);
+       	       exit(1);
+       }
        out_file = fopen(argv[4], "w");
-
+       if(out_file == NULL){
+	       fprintf(stderr, "Error opening %s\n", argv[4]);
+	       exit(1);
+       }
     }else if(strcmp(argv[1],"-o")==0 ){
 
 	in_file = fopen(argv[4], "r");
+	if(in_file == NULL){
+		fprintf(stderr,"Error opening %s\n", argv[4]);
+		exit(1);
+        }
 	out_file = fopen(argv[2], "w");
-
+	if(out_file == NULL){
+		fprintf(stderr, "Error opening %s\n", argv[2]);
+		exit(1);
+	}
     }else{
-	printf("Format: -i <inputfile> -o <outputfile>");
-	return 0;
+	printf("Usage: -i <inputfile> -o <outputfile>\n");
+	exit(1);
 
     }
 
@@ -43,7 +61,7 @@ int main(int argc, char *argv[]){
 
     file_size = in_file_info.st_size;
     
-    words = (char*)malloc(sizeof(char)*512);	   
+    words = (char*)malloc(file_size);	   
     fread(words, sizeof(char), file_size, in_file);	    
    
     int k=0;
@@ -91,17 +109,6 @@ int main(int argc, char *argv[]){
        j++;	
 
     }
-
-   
-    
-
-   
-
-  
-
-
- 	 
-  
    
    for(j=0; j<num_lines; j++){
 	if(j >= num_lines-j-1){
@@ -123,7 +130,9 @@ int main(int argc, char *argv[]){
    }	
 
     
-
+   for(j=0; j<num_lines; j++){
+      free(ptrs_to_words[j]);
+   }
     free(ptrs_to_words);
     free(word);
     free(char_per_line);

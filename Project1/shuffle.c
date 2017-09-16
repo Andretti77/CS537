@@ -104,20 +104,25 @@ int main(int argc, char *argv[]){
   
    
    for(j=0; j<num_lines; j++){
-	if(ptrs_to_words[j] == ptrs_to_words[num_lines-j-1]){
-		fwrite(ptrs_to_words[j], sizeof(char), char_per_line[j], out_file);
-		break;
+	if(j >= num_lines-j-1){
+		if(j == num_lines-j-1){
+		   fwrite(ptrs_to_words[j], sizeof(char), char_per_line[j], out_file);
+		  
+		}
+
+		j = num_lines;
 	
-	}	
+	}else{	
 	   
-	fwrite(ptrs_to_words[j],sizeof(char),char_per_line[j], out_file);
-
-	fwrite(ptrs_to_words[num_lines-j-1],sizeof(char), char_per_line[num_lines-j-1] , out_file);	
-
+	 fwrite(ptrs_to_words[j],sizeof(char),char_per_line[j], out_file);
+	 
+	 fwrite(ptrs_to_words[num_lines-j-1],sizeof(char), char_per_line[num_lines-j-1] , out_file);
+ 	 	 
+	}
 
    }	
 
-
+    
 
     free(ptrs_to_words);
     free(word);

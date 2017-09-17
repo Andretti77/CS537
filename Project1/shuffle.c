@@ -6,7 +6,8 @@ int main(int argc, char *argv[]){
 
 
     if(argc >5){
-	printf("Usage: -i <inputfile> -o <outputfile>\n");
+	fprintf(stderr,"Usage: shuffle -i inputfile -o outputfile\n");
+	exit(1);
     }	    
     FILE* in_file;
     FILE* out_file;
@@ -17,28 +18,28 @@ int main(int argc, char *argv[]){
 
        in_file = fopen(argv[2],"r");
        if(in_file == NULL){
-	       fprintf(stderr, "Error opening %s\n", argv[2]);
+	       fprintf(stderr, "Error: Cannot open file %s\n", argv[2]);
        	       exit(1);
        }
        out_file = fopen(argv[4], "w");
        if(out_file == NULL){
-	       fprintf(stderr, "Error opening %s\n", argv[4]);
+	       fprintf(stderr, "Error: Cannot open file  %s\n", argv[4]);
 	       exit(1);
        }
     }else if(strcmp(argv[1],"-o")==0 ){
 
 	in_file = fopen(argv[4], "r");
 	if(in_file == NULL){
-		fprintf(stderr,"Error opening %s\n", argv[4]);
+		fprintf(stderr,"Error: Cannot open file %s\n", argv[4]);
 		exit(1);
         }
 	out_file = fopen(argv[2], "w");
 	if(out_file == NULL){
-		fprintf(stderr, "Error opening %s\n", argv[2]);
+		fprintf(stderr, "Error: Cannot open file %s\n", argv[2]);
 		exit(1);
 	}
     }else{
-	printf("Usage: -i <inputfile> -o <outputfile>\n");
+	fprintf(stderr,"Usage: shuffle -i inputfile -o outputfile\n");
 	exit(1);
 
     }
@@ -62,8 +63,11 @@ int main(int argc, char *argv[]){
     file_size = in_file_info.st_size;
     
     words = (char*)malloc(file_size);	   
-    fread(words, sizeof(char), file_size, in_file);	    
-   
+    int temp = fread(words, sizeof(char), file_size, in_file);	    
+  
+    if(temp != file_size){
+	
+    } 
     int k=0;
     while(words[k]!='\0'){
 

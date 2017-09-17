@@ -64,10 +64,12 @@ int main(int argc, char *argv[]){
     
     words = (char*)malloc(file_size);	   
     int temp = fread(words, sizeof(char), file_size, in_file);	    
-  
+
     if(temp != file_size){
-	
-    } 
+    //just used to get rid of a warning message for not using the return 
+    //value of fread()
+    }  
+    
     int k=0;
     while(words[k]!='\0'){
 

@@ -66,8 +66,7 @@ int main(int argc, char *argv[]){
     int temp = fread(words, sizeof(char), file_size, in_file);	    
 
     if(temp != file_size){
-    //just used to get rid of a warning message for not using the return 
-    //value of fread()
+      exit(1);
     }  
     
     int k=0;

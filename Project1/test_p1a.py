@@ -46,6 +46,7 @@ class Test(object):
         If nothing fails, the point value of the test is returned."""
 
         print('='*21 + ('%s starts' % cls.name).center(30) + '='*21)
+	print cls.description
 
         try:
             with Timeout(cls.timeout):
@@ -104,6 +105,9 @@ class ShuffleTest(Test):
 
     @classmethod
     def test(cls):
+	if os.path.isfile('outputfile'):
+            os.remove('outputfile')
+
         input_lines = cls.generate_lines()
         with open('inputfile', 'w') as f:
             f.write(''.join(input_lines))
@@ -147,15 +151,33 @@ class T1(ExpectErrorTest):
 
 
 class T2(ExpectErrorTest):
-    name = "invalid argument test"
-    description = "tests on invalid arguments"
+    name = "invalid argument test 1"
+    description = "tests on too few of arguments"
 
     cmd = './shuffle # %s'
     returncode = 1
     err_msg = "Usage: shuffle -i inputfile -o outputfile\n"
 
 
-class T3(ShuffleTest):
+class T3(ExpectErrorTest):
+    name = "invalid argument test 2"
+    description = "tests on too many arguments"
+
+    cmd = './shuffle -i # -o # -xyz %s'
+    returncode = 1
+    err_msg = "Usage: shuffle -i inputfile -o outputfile\n"
+
+
+class T4(ExpectErrorTest):
+    name = "invalid argument test 3"
+    description = "tests on arguments with wrong flags"
+
+    cmd = './shuffle -x %s -y outputfile'
+    returncode = 1
+    err_msg = "Usage: shuffle -i inputfile -o outputfile\n"
+
+
+class T5(ShuffleTest):
     name = "example test"
     description = "comes from the project specification"
 
@@ -164,12 +186,23 @@ class T3(ShuffleTest):
         return ['first\n', 'second\n', 'third\n', 'fourth\n', 'fifth\n']
 
 
-class T4(ShuffleTest):
+class T6(ShuffleTest):
+    name = "switched arguments test"
+    description = "tests different order of arguments"
+
+    cmd = './shuffle -o outputfile -i %s'
+
+    @staticmethod
+    def generate_lines():
+	return ['first\n', 'second\n', 'third\n', 'fourth\n', 'fifth\n']
+
+
+class T7(ShuffleTest):
     name = "empty file test"
     description = "tests on an empty file"
 
 
-class T5(ShuffleTest):
+class T8(ShuffleTest):
     name = "normal test 1"
     description = "tests on 1000 short lines"
 
@@ -178,7 +211,7 @@ class T5(ShuffleTest):
         return ['%d\n' % i for i in range(1000)]
 
 
-class T6(ShuffleTest):
+class T9(ShuffleTest):
     name = "normal test 2"
     description = "tests on 1000 long lines"
 
@@ -187,7 +220,33 @@ class T6(ShuffleTest):
         return [('%d\n' % i).rjust(511, '*') for i in range(1000)]
 
 
-class T7(ShuffleTest):
+class T10(ShuffleTest):
+    name = "normal test 3"
+    description = "tests on 5000 varying length lines"
+
+    @staticmethod
+    def generate_lines():
+	return [('%d\n' % i).rjust(i % 511, '*') for i in range(5000)]
+
+
+class T11(ShuffleTest):
+    name = "normal test 4"
+    description = "tests on odd number of long lines"
+
+    @staticmethod
+    def generate_lines():
+	return [('%d\n' % i).rjust(511, '*') for i in range(5001)]
+
+
+class T12(ShuffleTest):
+    name = "normal test 5"
+    description = "tests on 10 thousand newlines"
+
+    @staticmethod
+    def generate_lines():
+	return ['\n' for i in range(10000)]
+
+class T13(ShuffleTest):
     name = "stress test 1"
     description = "tests on 100 thousand long lines (~50MB)"
 
@@ -196,7 +255,7 @@ class T7(ShuffleTest):
         return [('%d\n' % i).rjust(511, '*') for i in range(100*1000)]
 
 
-class T8(ShuffleTest):
+class T14(ShuffleTest):
     name = "stress test 2"
     description = "tests on 10 million short lines (~100MB)"
 
@@ -217,6 +276,7 @@ def run_tests(tests, short_circuit=True):
         else:
             succeeded += 1
         points += point
+    return
     print('='*21 + 'cleaning up'.center(30) + '='*21)
     for f in ['inputfile', 'outputfile', 'shuffle']:
         if os.path.isfile(f):
@@ -226,11 +286,13 @@ def run_tests(tests, short_circuit=True):
     print
 
     notrun = len(tests)-succeeded-failed
-    print('succeeded/failed/not-run: %d %d %d' % (succeeded, failed, notrun))
+    print('succeeded: %d' % succeeded)
+    print('failed: %d' % failed)
+    print('not-run: %d\n' % notrun)
     print('score: %d (out of %d)' % (points, tot_points))
 
 def main():
-    run_tests([T0, T1, T2, T3, T4, T5, T6, T7, T8])
+    run_tests([T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14])
 
 if __name__ == '__main__':
     main()

@@ -5,7 +5,7 @@
 int main(int argc, char *argv[]){
 
 
-    if(argc >5){
+    if(argc!=5){
 	fprintf(stderr,"Usage: shuffle -i inputfile -o outputfile\n");
 	exit(1);
     }	    
@@ -108,13 +108,16 @@ int main(int argc, char *argv[]){
 	
 	 char_num = 0;
 	 curr_line++;
+	
 	 word = (char*)malloc(sizeof(char)*512);
 
 	} 
        j++;	
 
-    }
-   
+   }
+
+  free(words);     
+
    for(j=0; j<num_lines; j++){
 	if(j >= num_lines-j-1){
 		if(j == num_lines-j-1){
@@ -140,8 +143,8 @@ int main(int argc, char *argv[]){
    }
     free(ptrs_to_words);
     free(word);
+    //free(words);
     free(char_per_line);
-    free(words);
     fclose(in_file);
     fclose(out_file);
     return 0;

@@ -3,41 +3,66 @@
 #include <string.h>
 #include <unistd.h>
 #include <libgen.h>
+#include <errno.h>
 
 int main(){
     int command_num = 1;
-    char* command = (char*)malloc(128*sizeof(char));
+    char* input = (char*)malloc(128*sizeof(char));
     while(1){
         printf("mysh (%d)>", command_num);
-        fgets(command, 128*sizeof(char), stdin);
-        
+        fgets(input, 128*sizeof(char), stdin);
+        char* command = strtok(input, " \n");
        
 
 
-        if(strstr(command, "exit") != NULL){
+        if(strcmp(command, "exit") == 0){
                 exit(0);
-        }else if(strstr(command, "cd") != NULL){
-                strtok(command, " ");
-                char* directory = strtok(NULL, " ");
+        }else if(strcmp(command, "cd") == 0){
+                char* directory = strtok(NULL, " \n");
                 if(directory == NULL){
                     directory = getenv("HOME");
                     chdir(directory);
+
                 }else{
                     char* curr_dir = (char*)malloc(128);
-                    getcwd(curr_dir, 124);
+                    getcwd(curr_dir, 128);
                     char* path = (char*) malloc(strlen(directory)+strlen(curr_dir));
                     strcat(path,curr_dir+16);
                     strcat(path, "/");
                     strcat(path, directory);
                     chdir(path);
-                            
-                    
+                    free(path);
+                    free(directory);
+                    free(curr_dir);
                 }   
 
-        }else if(strstr(command, "pwd")!=NULL){
+        }else if(strcmp(command, "pwd") == 0){
                 char* directory = (char*)malloc(sizeof(char)*124);
                 getcwd(directory, 124);
                 printf("%s\n", directory);
+                free(directory);
+
+        }else{
+            char** arguments = (char**) malloc(64*sizeof(char*));
+            int i;
+            arguments[0] = command;
+            for(i=1; i<256; i++){
+
+                char* arg = (char*) malloc(128);
+                arg = strtok(NULL, " \n");
+                if(arg == NULL){
+                        arguments[i] = arg;
+                        break;
+                }else{
+                   arguments[i] = arg;
+                }
+                
+            }
+       
+               
+            execvp(command,arguments);
+            
+
 
         }
 
@@ -50,7 +75,7 @@ int main(){
     }
 
 
-    free(command);
+    free(input);
 
 
 }

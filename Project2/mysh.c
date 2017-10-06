@@ -27,16 +27,11 @@ int main(){
                     chdir(directory);
 
                 }else{
-                    char* curr_dir = (char*)malloc(128);
-                    getcwd(curr_dir, 128);
-                    char* path = (char*) malloc(strlen(directory)+strlen(curr_dir));
-                    strcat(path,curr_dir+16);
-                    strcat(path, "/");
+                    char* path = (char*) malloc(strlen(directory));
+                    strcat(path, "./");
                     strcat(path, directory);
                     chdir(path);
                     free(path);
-                    
-                    free(curr_dir);
                 }   
 
         }else if(strcmp(command, "pwd") == 0){

@@ -9,9 +9,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+int output_redirection = 0;
 
-
-char* cdfunc(){
+void cdfunc(){
     char* directory = strtok(NULL, " \n\t");
     if(directory == NULL){
         directory = getenv("HOME");
@@ -25,14 +25,12 @@ char* cdfunc(){
         chdir(path);
         free(path);
     }
-    char* output = "";
-    return output;
 }
 
-char* pwdfunc(){
+void pwdfunc(){
     char* directory = (char*)malloc(sizeof(char)*124);
     getcwd(directory, 124);
-    return directory;
+    printf("%s\n",directory);
 }
 
 void execfunc(char* command){
@@ -40,7 +38,6 @@ void execfunc(char* command){
     int i;
     arguments[0] = command;
     for(i=1; i<256; i++){
-        
         char* arg = (char*) malloc(128);
         arg = strtok(NULL, " \n");
         arguments[i]= arg;
@@ -63,21 +60,18 @@ int main(){
         char* input = (char*) malloc(sizeof(char)*128);
         printf("mysh (%d)>", command_num);
         fgets(input, 128*sizeof(char), stdin);
+        
         char* command = strtok(input, " \n\t");
-        char* output = (char*)malloc(sizeof(char)*124);
-        if(strcmp(command, "exit") == 0){
+        
+        if(strcmp(command, "exit") == 0)
             exit(0);
-        }else if(strcmp(command, "cd") == 0){
-            output = cdfunc();
-
-        }else if(strcmp(command, "pwd") == 0){
-            output = pwdfunc();
-        }else{
+        else if(strcmp(command, "cd") == 0)
+            cdfunc();
+        else if(strcmp(command, "pwd") == 0)
+            pwdfunc();
+        else
             execfunc(command);
-        }
-        if(strcmp(output, "") != 0){
-            printf("%s\n", output);
-        }
+        
         fflush(stdout);
         command_num++;
         free(input);

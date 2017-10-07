@@ -41,6 +41,7 @@ void execfunc(char* command){
     int fd;
     int out_redirection = 0;
     int in_redirection = 0;
+    int pipe = 0;
     char* infile = (char*) malloc(sizeof(char)*128);
     char* outfile = (char*) malloc(sizeof(char)*128);
     char* infile_arguments = (char*) malloc(sizeof(char)*128);
@@ -58,12 +59,23 @@ void execfunc(char* command){
         }else if (strcmp(arg, "<") == 0){
             in_redirection = 1;
             infile = strtok(NULL, " \n\t");
+        }else if(strcmp(arg, "|") == 0){
+            pipe = 1;
+            arg[i] = '\0';
+            break;
         }
         else{
             arguments[i]= arg;
         }
     }
     int pid;
+    int pipefd[2];
+
+    if(pipe == 1){
+        if(pipe(pipefd) == -1)
+            printf("READ");
+    }
+    
     pid= fork();
     if(pid == 0){
         if(out_redirection == 1){
@@ -76,30 +88,40 @@ void execfunc(char* command){
             dup2(fd, 0);
             close(fd);
             fgets(infile_arguments, 128, stdin);
-            i = 1;
+            int j = i - 1;
             arguments[i] = strtok(infile_arguments, " \n\t");
             printf("%s %d\n", arguments[i], i);
-            for(i = 2; i<128; i++){
+            for(j = 2; j<128; j++){
                 char* arg = (char*) malloc(128);
                 arg = strtok(NULL, " \n\t");
                 if(arg == NULL){
-                    arguments[i]= arg;
+                    arguments[j]= arg;
                     break;
                 }
                 if(strcmp(arg, ">") == 0){
                     out_redirection = 1;
                     outfile = strtok(NULL, " \n\t");
+                }else if(strcmp(arg, "|") == 0){
+                    pipe = 1;
+                    arg[i] = '\0';
+                    break;
                 }
                 else{
-                    arguments[i]= arg;
+                    arguments[j]= arg;
                 }
             }
+        }
+        if(pipe == 1){
+            dup2(pipefd[0], 1);
+            close(pipefd[1]);
         }
         if(execvp(command,arguments)){
             write(STDERR_FILENO, error_message, strlen(error_message));
             kill(getpid(), SIGINT);
         }
     }else{
+        if(pipe == 1)
+            close(pipefd[0]);
         waitpid(pid, NULL, 0);
     }
     free(arguments);

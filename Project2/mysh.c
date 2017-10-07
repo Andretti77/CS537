@@ -8,6 +8,10 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <signal.h>
+
+
+char error_message[30] = "An error has occurred\n";
 
 void cdfunc(){
     char* directory = strtok(NULL, " \n\t");
@@ -72,11 +76,10 @@ void execfunc(char* command){
             dup2(fd, 0);
             close(fd);
             fgets(infile_arguments, 128, stdin);
-            i = i-1;
+            i = 1;
             arguments[i] = strtok(infile_arguments, " \n\t");
-            i++;
             printf("%s %d\n", arguments[i], i);
-            for(; i<128; i++){
+            for(i = 2; i<128; i++){
                 char* arg = (char*) malloc(128);
                 arg = strtok(NULL, " \n\t");
                 if(arg == NULL){
@@ -90,13 +93,12 @@ void execfunc(char* command){
                 else{
                     arguments[i]= arg;
                 }
-
             }
-            
-            
-            
         }
-        execvp(command,arguments);
+        if(execvp(command,arguments)){
+            write(STDERR_FILENO, error_message, strlen(error_message));
+            kill(getpid(), SIGINT);
+        }
     }else{
         waitpid(pid, NULL, 0);
     }

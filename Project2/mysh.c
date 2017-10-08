@@ -36,6 +36,10 @@ void cdfunc(){
 
 void pwdfunc(){
     char* directory = (char*)malloc(sizeof(char)*124);
+    if(strtok(NULL, " \n\t") != NULL){
+       write(STDERR_FILENO, error_message, strlen(error_message));
+       return;
+    }
     getcwd(directory, 124);
     printf("%s\n",directory);
 }
@@ -63,9 +67,17 @@ void execfunc(char* command){
         if(strcmp(arg, ">") == 0){
             out_redirection = 1;
             outfile = strtok(NULL, " \n\t");
+            if(outfile == NULL){
+                write(STDERR_FILENO, error_message, strlen(error_message));
+                return;
+            }
         }else if (strcmp(arg, "<") == 0){
             in_redirection = 1;
             infile = strtok(NULL, " \n\t");
+            if(infile == NULL){
+                write(STDERR_FILENO, error_message, strlen(error_message));
+                return;
+            }
         }else if(strcmp(arg, "|") == 0){
             pipeBool = 1;
             arguments[i] = NULL;
@@ -74,6 +86,10 @@ void execfunc(char* command){
             background = 1;
         }
         else{
+            if(in_redirection == 1 || out_redirection == 1){
+                write(STDERR_FILENO, error_message, strlen(error_message));
+                return;
+            }
             arguments[i]= arg;
         }
     }
@@ -82,13 +98,17 @@ void execfunc(char* command){
     pid= fork();
     if(pid == 0){
         if(out_redirection == 1){
-            fd = open(outfile, O_WRONLY|O_CREAT|O_TRUNC);
+            fd = open(outfile, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR);
             dup2(fd, 1);
             close(fd);
         }
         
         if(in_redirection == 1){
             fd = open(infile, O_RDONLY);
+            if(fd == -1){
+                write(STDERR_FILENO, error_message, strlen(error_message));
+                exit(0);
+            }
             dup2(fd, STDIN_FILENO);
         }
 

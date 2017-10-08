@@ -120,30 +120,42 @@ void execfunc(char* command){
         if(pipeBool == 1){
             int pid2;
             int pipefd[2];
+            char** rhs_arguments = (char**) malloc(sizeof(char*)* 64);
+            for(i=0;i<256;i++){
+                char* arg = (char*) malloc(128);
+                arg = strtok(NULL, " \n\t");
+                
+                if(arg == NULL){
+                    rhs_arguments[i]= arg;
+                    break;
+                }else{ 
+                     rhs_arguments[i]= arg;
+                }
+            }
+            if(rhs_arguments[0] == NULL){
+                write(STDERR_FILENO, error_message, strlen(error_message));
+                kill(getpid(), SIGINT);
+            }
             pipe(pipefd);
             pid2 = fork();
             
             if(pid2 == 0){
                 close(pipefd[1]);
                 dup2(pipefd[0], STDIN_FILENO);
-                char** rhs_arguments = (char**) malloc(sizeof(char*)* 64);
-                for(i=0;i<256;i++){
-                    char* arg = (char*) malloc(128);
-                    arg = strtok(NULL, " \n\t");
-                    
-                    if(arg == NULL){
-                        rhs_arguments[i]= arg;
-                        break;
-                    }else
-                        rhs_arguments[i]= arg;
+                if(execvp(rhs_arguments[0], rhs_arguments)){
+                    write(STDERR_FILENO, error_message, strlen(error_message));
+                    kill(getpid(), SIGINT);
                 }
-                execvp(rhs_arguments[0], rhs_arguments);
                 exit(0);
                 
             }else{
                 close(pipefd[0]);
                 dup2(pipefd[1], STDOUT_FILENO);
-                execvp(command, arguments);
+                if(execvp(command,arguments)){
+                    write(STDERR_FILENO, error_message, strlen(error_message));
+                    kill(getpid(), SIGINT);
+                }
+                close(pipefd[1]);
                 exit(0);
             }
             
@@ -155,7 +167,7 @@ void execfunc(char* command){
         }
     }else{
         if(!background){
-            waitpid(pid, NULL, 0);
+            waitpid(pid,NULL,0);
         }
     }
     free(arguments);

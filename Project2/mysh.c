@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,7 +35,7 @@ void pwdfunc(){
 }
 
 void execfunc(char* command){
-    char** arguments = (char**) malloc(64*sizeof(char*));
+    
     int i;
     int fd;
     int out_redirection = 0;
@@ -44,8 +43,9 @@ void execfunc(char* command){
     int pipeBool = 0;
     char* infile = (char*) malloc(sizeof(char)*128);
     char* outfile = (char*) malloc(sizeof(char)*128);
-    char* infile_arguments = (char*) malloc(sizeof(char)*128);
+    char** arguments = (char**) malloc(64*sizeof(char*));
     arguments[0] = command;
+    
     for(i=1; i<256; i++){
         char* arg = (char*) malloc(128);
         arg = strtok(NULL, " \n");
@@ -69,12 +69,6 @@ void execfunc(char* command){
         }
     }
     int pid;
-    int pipefd[2];
-
-    if(pipeBool == 1){
-        if(pipe(pipefd) == -1)
-            printf("READ");
-    }
     
     pid= fork();
     if(pid == 0){
@@ -86,97 +80,37 @@ void execfunc(char* command){
         
         if(in_redirection == 1){
             fd = open(infile, O_RDONLY);
-            dup2(fd, 0);
-            close(fd);
-            fgets(infile_arguments, 128, stdin);
-            int j = i - 1;
-            arguments[i] = strtok(infile_arguments, " \n\t");
-            
-            for(j = 2; j<128; j++){
-                char* arg = (char*) malloc(128);
-                arg = strtok(NULL, " \n\t");
-                if(arg == NULL){
-                    arguments[j]= arg;
-                    break;
-                }
-                if(strcmp(arg, ">") == 0){
-                    out_redirection = 1;
-                    outfile = strtok(NULL, " \n\t");
-                }else if(strcmp(arg, "|") == 0){
-                    pipeBool = 1;
-                    arg[i] = '\0';
-                    break;
-                }
-                else{
-                    arguments[j]= arg;
-                }
-            }
+            dup2(fd, STDIN_FILENO);
         }
         
         if(pipeBool == 1){
             int pid2;
+            int pipefd[2];
+            pipe(pipefd);
             pid2 = fork();
             
             if(pid2 == 0){
-                close(pipefd[0]);
-                dup2(pipefd[1], 1);
                 close(pipefd[1]);
-                
-                execvp(command, arguments);
-                
-            }else{
-                waitpid(pid2, NULL, 0);
-                close(pipefd[1]);
-                dup2(pipefd[0], 0);
-                close(pipefd[0]);
+                dup2(pipefd[0], STDIN_FILENO);
                 char** rhs_arguments = (char**) malloc(sizeof(char*)* 64);
                 for(i=0;i<256;i++){
-                    
                     char* arg = (char*) malloc(128);
                     arg = strtok(NULL, " \n\t");
                     
                     if(arg == NULL){
                         rhs_arguments[i]= arg;
                         break;
-                    }
-                    if(strcmp(arg, ">") == 0){
-                        out_redirection = 1;
-                        outfile = strtok(NULL, " \n\t");
-                    }else if (strcmp(arg, "<") == 0){
-                        in_redirection = 1;
-                        infile = strtok(NULL, " \n\t");
-                    }else{
+                    }else
                         rhs_arguments[i]= arg;
-                    }
                 }
-                
-                char* rhs_args = (char*) malloc(sizeof(char)*128);
-                fgets(rhs_args, 128, stdin);
-                rhs_arguments[i]= strtok(rhs_args, " \n\t");
-                
-                
-                for(i = i+1; i<256; i++){
-                    char* arg = (char*) malloc(128);
-                    arg = strtok(NULL, " \n\t");
-                    if(arg == NULL){
-                        rhs_arguments[i]= arg;
-                        break;
-                    }
-                    if(strcmp(arg, ">") == 0){
-                        out_redirection = 1;
-                        outfile = strtok(NULL, " \n\t");
-                    }else if (strcmp(arg, "<") == 0){
-                        in_redirection = 1;
-                        infile = strtok(NULL, " \n\t");
-                    }else{
-                        rhs_arguments[i]= arg;
-                    }
-                }
-                //printf("%s%s%s\n", arguments[0],arguments[1],arguments[2]);
                 execvp(rhs_arguments[0], rhs_arguments);
+                exit(0);
                 
-                
-                
+            }else{
+                close(pipefd[0]);
+                dup2(pipefd[1], STDOUT_FILENO);
+                execvp(command, arguments);
+                exit(0);
             }
             
         }else{
@@ -186,7 +120,6 @@ void execfunc(char* command){
             }
         }
     }else{
-        
         waitpid(pid, NULL, 0);
     }
     free(arguments);

@@ -109,7 +109,6 @@ void execfunc(char* command){
             }else{
                 close(pipefd[0]);
                 dup2(pipefd[1], STDOUT_FILENO);
-                printf("HERE");
                 execvp(command, arguments);
                 exit(0);
             }
@@ -130,7 +129,7 @@ int main(){
     int command_num = 1;
     while(1){
         char* input = (char*) malloc(sizeof(char)*128);
-        printf("mysh (%d)>", command_num);
+        printf("mysh (%d)> ", command_num);
         fgets(input, 128*sizeof(char), stdin);
         char* command = strtok(input, " \n\t");
         if(strcmp(command, "exit") == 0)

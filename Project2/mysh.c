@@ -11,19 +11,25 @@
 
 
 char error_message[30] = "An error has occurred\n";
-
+int* processes; 
+int curr_process_index = 0;
 void cdfunc(){
     char* directory = strtok(NULL, " \n\t");
     if(directory == NULL){
         directory = getenv("HOME");
         chdir(directory);
-        free(directory);
         
-    }else{
+    }else if(directory[0] == '/'){
+        chdir(directory);    
+        if(chdir(directory) == -1)
+            write(STDERR_FILENO, error_message, strlen(error_message));
+    }
+    else{
         char* path = (char*) malloc(strlen(directory));
         strcat(path, "./");
         strcat(path, directory);
-        chdir(path);
+        if(chdir(path) == -1)
+            write(STDERR_FILENO, error_message, strlen(error_message));
         free(path);
     }
 }
@@ -41,6 +47,7 @@ void execfunc(char* command){
     int out_redirection = 0;
     int in_redirection = 0;
     int pipeBool = 0;
+    int background = 0;
     char* infile = (char*) malloc(sizeof(char)*128);
     char* outfile = (char*) malloc(sizeof(char)*128);
     char** arguments = (char**) malloc(64*sizeof(char*));
@@ -63,6 +70,8 @@ void execfunc(char* command){
             pipeBool = 1;
             arguments[i] = NULL;
             break;
+        }else if(strcmp(arg, "&") == 0){
+            background = 1;
         }
         else{
             arguments[i]= arg;
@@ -82,7 +91,12 @@ void execfunc(char* command){
             fd = open(infile, O_RDONLY);
             dup2(fd, STDIN_FILENO);
         }
-        
+
+        if(background){
+            processes[curr_process_index] = getpid();
+            curr_process_index++;
+        }
+
         if(pipeBool == 1){
             int pid2;
             int pipefd[2];
@@ -120,31 +134,65 @@ void execfunc(char* command){
             }
         }
     }else{
-        waitpid(pid, NULL, 0);
+        if(!background){
+            waitpid(pid, NULL, 0);
+        }
     }
     free(arguments);
 }
 
-int main(){
+void exitfunc(){
+
+    int j;
+
+    for(j = 0; j<curr_process_index; j++){
+        kill(processes[j], 0);
+    }
+    free(processes);
+    exit(0);
+
+
+}
+
+int main(int argc, char* argv[]){
+    if(argc > 1){
+        write(STDERR_FILENO, error_message, strlen(error_message));
+        exit(1);
+    }
+
+    processes = (int*)malloc(sizeof(int)*20);
     int command_num = 1;
     while(1){
-        char* input = (char*) malloc(sizeof(char)*128);
+        char* input = (char*) malloc(sizeof(char)*1000);
         printf("mysh (%d)> ", command_num);
-        fgets(input, 128*sizeof(char), stdin);
+        fflush(stdout);
+        fgets(input, 1000*sizeof(char), stdin);
+        if( strlen(input) > 129){
+            write(STDERR_FILENO, error_message, strlen(error_message));
+            command_num++;
+            free(input);
+            continue;
+        }
+
+        
         char* command = strtok(input, " \n\t");
-        if(strcmp(command, "exit") == 0)
-            exit(0);
+        if(command == NULL){
+            free(input);
+            continue;
+        }
+        else if(strcmp(command, "exit") == 0)
+            exitfunc();
         else if(strcmp(command, "cd") == 0)
             cdfunc();
         else if(strcmp(command, "pwd") == 0)
             pwdfunc();
         else
             execfunc(command);
-        
-        fflush(stdout);
+        if(input != NULL)
+            free(input);
         command_num++;
-        free(input);
-
+        
     }
 }
+
 

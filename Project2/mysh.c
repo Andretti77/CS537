@@ -61,7 +61,7 @@ void execfunc(char* command){
             infile = strtok(NULL, " \n\t");
         }else if(strcmp(arg, "|") == 0){
             pipeBool = 1;
-            arguments[i] = "\0";
+            arguments[i] = NULL;
             break;
         }
         else{
@@ -109,6 +109,7 @@ void execfunc(char* command){
             }else{
                 close(pipefd[0]);
                 dup2(pipefd[1], STDOUT_FILENO);
+                printf("HERE");
                 execvp(command, arguments);
                 exit(0);
             }

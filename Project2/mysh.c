@@ -42,6 +42,7 @@ void pwdfunc(){
     }
     getcwd(directory, 124);
     printf("%s\n",directory);
+    free(directory);
 }
 
 void execfunc(char* command){
@@ -55,6 +56,7 @@ void execfunc(char* command){
     char* infile = (char*) malloc(sizeof(char)*128);
     char* outfile = (char*) malloc(sizeof(char)*128);
     char** arguments = (char**) malloc(64*sizeof(char*));
+    int status = -1;
     arguments[0] = command;
     
     for(i=1; i<256; i++){
@@ -62,6 +64,7 @@ void execfunc(char* command){
         arg = strtok(NULL, " \n");
         if(arg == NULL){
             arguments[i]= arg;
+            free(arg);
             break;
         }
         if(strcmp(arg, ">") == 0){
@@ -69,6 +72,10 @@ void execfunc(char* command){
             outfile = strtok(NULL, " \n\t");
             if(outfile == NULL){
                 write(STDERR_FILENO, error_message, strlen(error_message));
+                free(arguments);
+                free(infile);
+                free(outfile);
+                free(arg);
                 return;
             }
         }else if (strcmp(arg, "<") == 0){
@@ -76,11 +83,16 @@ void execfunc(char* command){
             infile = strtok(NULL, " \n\t");
             if(infile == NULL){
                 write(STDERR_FILENO, error_message, strlen(error_message));
+                free(arguments);
+                free(infile);
+                free(outfile);
+                free(arg);
                 return;
             }
         }else if(strcmp(arg, "|") == 0){
             pipeBool = 1;
             arguments[i] = NULL;
+            free(arg);
             break;
         }else if(strcmp(arg, "&") == 0){
             background = 1;
@@ -88,35 +100,44 @@ void execfunc(char* command){
         else{
             if(in_redirection == 1 || out_redirection == 1){
                 write(STDERR_FILENO, error_message, strlen(error_message));
+                
+                free(arguments);
+                free(infile);
+                free(outfile);
+                free(arg);
                 return;
             }
             arguments[i]= arg;
+            free(arg);
         }
     }
     int pid;
     
     pid= fork();
     if(pid == 0){
+        //out redirection
         if(out_redirection == 1){
             fd = open(outfile, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR);
             dup2(fd, 1);
             close(fd);
         }
         
+        //in redirection
         if(in_redirection == 1){
             fd = open(infile, O_RDONLY);
             if(fd == -1){
                 write(STDERR_FILENO, error_message, strlen(error_message));
+                free(arguments);
+                free(infile);
+                free(outfile);
                 exit(0);
             }
             dup2(fd, STDIN_FILENO);
+            close(fd);
         }
 
-        if(background){
-            processes[curr_process_index] = getpid();
-            curr_process_index++;
-        }
-
+       
+        // pipeline
         if(pipeBool == 1){
             int pid2;
             int pipefd[2];
@@ -127,13 +148,20 @@ void execfunc(char* command){
                 
                 if(arg == NULL){
                     rhs_arguments[i]= arg;
+                    free(arg);
                     break;
                 }else{ 
                      rhs_arguments[i]= arg;
+                     free(arg);
                 }
             }
             if(rhs_arguments[0] == NULL){
                 write(STDERR_FILENO, error_message, strlen(error_message));
+                
+                free(arguments);
+                free(infile);
+                free(outfile);
+                free(rhs_arguments);
                 kill(getpid(), SIGINT);
             }
             pipe(pipefd);
@@ -144,8 +172,16 @@ void execfunc(char* command){
                 dup2(pipefd[0], STDIN_FILENO);
                 if(execvp(rhs_arguments[0], rhs_arguments)){
                     write(STDERR_FILENO, error_message, strlen(error_message));
+                    free(arguments);
+                    free(infile);
+                    free(outfile);
+                    free(rhs_arguments);
                     kill(getpid(), SIGINT);
                 }
+                free(arguments);
+                free(infile);
+                free(outfile);
+                free(rhs_arguments);
                 exit(0);
                 
             }else{
@@ -153,23 +189,53 @@ void execfunc(char* command){
                 dup2(pipefd[1], STDOUT_FILENO);
                 if(execvp(command,arguments)){
                     write(STDERR_FILENO, error_message, strlen(error_message));
+                    free(arguments);
+                    free(infile);
+                    free(outfile);
+                    free(rhs_arguments);
                     kill(getpid(), SIGINT);
                 }
                 close(pipefd[1]);
+                free(arguments);
+                free(infile);
+                free(outfile);
+                free(rhs_arguments);
                 exit(0);
             }
+                
             
         }else{
+            //regular process
             if(execvp(command,arguments)){
                 write(STDERR_FILENO, error_message, strlen(error_message));
+                free(arguments);
+                free(infile);
+                free(outfile);
                 kill(getpid(), SIGINT);
             }
+            if(!background){
+                free(arguments);
+                free(infile);
+                free(outfile);
+                exit(0);
+            }
         }
+
+        
     }else{
         if(!background){
-            waitpid(pid,NULL,0);
+            waitpid(pid,&status,0);
+        }else{
+            waitpid(pid, &status, WNOHANG);
+            if(status == 0){
+                processes[curr_process_index] = pid;
+                curr_process_index++; 
+            }
         }
+
     }
+    free(infile);
+    free(outfile);
     free(arguments);
 }
 
@@ -178,7 +244,7 @@ void exitfunc(){
     int j;
 
     for(j = 0; j<curr_process_index; j++){
-        kill(processes[j], 0);
+        kill(processes[j], SIGKILL);
     }
     free(processes);
     exit(0);
@@ -220,8 +286,8 @@ int main(int argc, char* argv[]){
             pwdfunc();
         else
             execfunc(command);
-        if(input != NULL)
-            free(input);
+            
+        free(input);
         command_num++;
         
     }

@@ -64,7 +64,6 @@ void execfunc(char* command){
         arg = strtok(NULL, " \n");
         if(arg == NULL){
             arguments[i]= arg;
-            free(arg);
             break;
         }
         if(strcmp(arg, ">") == 0){
@@ -74,7 +73,6 @@ void execfunc(char* command){
                 write(STDERR_FILENO, error_message, strlen(error_message));
                 free(arguments);
                 free(infile);
-                free(outfile);
                 free(arg);
                 return;
             }
@@ -84,7 +82,6 @@ void execfunc(char* command){
             if(infile == NULL){
                 write(STDERR_FILENO, error_message, strlen(error_message));
                 free(arguments);
-                free(infile);
                 free(outfile);
                 free(arg);
                 return;
@@ -128,8 +125,6 @@ void execfunc(char* command){
             if(fd == -1){
                 write(STDERR_FILENO, error_message, strlen(error_message));
                 free(arguments);
-                free(infile);
-                free(outfile);
                 exit(0);
             }
             dup2(fd, STDIN_FILENO);
@@ -148,7 +143,6 @@ void execfunc(char* command){
                 
                 if(arg == NULL){
                     rhs_arguments[i]= arg;
-                    free(arg);
                     break;
                 }else{ 
                      rhs_arguments[i]= arg;
@@ -161,7 +155,6 @@ void execfunc(char* command){
                 free(arguments);
                 free(infile);
                 free(outfile);
-                free(rhs_arguments);
                 kill(getpid(), SIGINT);
             }
             pipe(pipefd);
@@ -178,10 +171,10 @@ void execfunc(char* command){
                     free(rhs_arguments);
                     kill(getpid(), SIGINT);
                 }
-                free(arguments);
-                free(infile);
-                free(outfile);
-                free(rhs_arguments);
+                //free(arguments);
+                //free(infile);
+                //free(outfile);
+                //free(rhs_arguments);
                 exit(0);
                 
             }else{
@@ -196,10 +189,10 @@ void execfunc(char* command){
                     kill(getpid(), SIGINT);
                 }
                 close(pipefd[1]);
-                free(arguments);
-                free(infile);
-                free(outfile);
-                free(rhs_arguments);
+                //free(arguments);
+                //free(infile);
+                //free(outfile);
+                //free(rhs_arguments);
                 exit(0);
             }
                 

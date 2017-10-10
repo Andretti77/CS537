@@ -9,9 +9,8 @@
 #include <fcntl.h>
 #include <signal.h>
 
-
 char error_message[30] = "An error has occurred\n";
-int* processes; 
+int processes[20]; 
 int curr_process_index = 0;
 
 void pipefunc(char** arguments){
@@ -204,7 +203,7 @@ void execfunc(char* command){
         int pid;
         pid= fork();
         if(pid == 0){
-            //child of first fork
+            //child of fork
             //out redirection
             if(out_redirection == 1){
                 fd = open(outfile, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR);
@@ -264,7 +263,7 @@ void execfunc(char* command){
 
 
         }else{
-            //parent of first fork
+            //parent of fork
 
 
             if(!background){
@@ -299,11 +298,34 @@ void exitfunc(){
     for(j = 0; j<curr_process_index; j++){
         kill(processes[j], SIGKILL);
     }
-    free(processes);
+  
     exit(0);
 
 
 }
+
+void cleanup(){
+
+    int i;
+    for(i =0; i< curr_process_index; i++){
+        if( waitpid(processes[i], NULL, WNOHANG)!=0){
+            int j;
+            
+            
+            for(j = i+1; j<curr_process_index; j++){
+                    processes[j-1] = processes[j];
+
+            }
+            curr_process_index--;
+
+        }
+
+
+    }
+
+
+}
+
 
 int main(int argc, char* argv[]){
     if(argc > 1){
@@ -311,7 +333,7 @@ int main(int argc, char* argv[]){
         exit(1);
     }
 
-    processes = (int*)malloc(sizeof(int)*20);
+   
     int command_num = 1;
     while(1){
         char* input = (char*) malloc(sizeof(char)*1000);
@@ -338,7 +360,9 @@ int main(int argc, char* argv[]){
             pwdfunc();
         else
             execfunc(command);
+        
 
+        cleanup();
         free(input);
         command_num++;
 

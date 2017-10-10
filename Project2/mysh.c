@@ -56,7 +56,6 @@ void execfunc(char* command){
     char* infile = (char*) malloc(sizeof(char)*128);
     char* outfile = (char*) malloc(sizeof(char)*128);
     char** arguments = (char**) malloc(64*sizeof(char*));
-    int status = -1;
     arguments[0] = command;
     
     for(i=1; i<256; i++){
@@ -71,9 +70,12 @@ void execfunc(char* command){
             outfile = strtok(NULL, " \n\t");
             if(outfile == NULL){
                 write(STDERR_FILENO, error_message, strlen(error_message));
-                free(arguments);
-                free(infile);
-                free(arg);
+                if(arguments != NULL){
+                   // free(arguments);
+                }
+                if(infile != NULL){
+                   // free(infile);
+                }
                 return;
             }
         }else if (strcmp(arg, "<") == 0){
@@ -81,15 +83,17 @@ void execfunc(char* command){
             infile = strtok(NULL, " \n\t");
             if(infile == NULL){
                 write(STDERR_FILENO, error_message, strlen(error_message));
-                free(arguments);
-                free(outfile);
-                free(arg);
+                if(arguments != NULL){
+                  //  free(arguments);
+                }
+                if(outfile != NULL){
+                   // free(outfile);
+                }
                 return;
             }
         }else if(strcmp(arg, "|") == 0){
             pipeBool = 1;
             arguments[i] = NULL;
-            free(arg);
             break;
         }else if(strcmp(arg, "&") == 0){
             background = 1;
@@ -98,20 +102,28 @@ void execfunc(char* command){
             if(in_redirection == 1 || out_redirection == 1){
                 write(STDERR_FILENO, error_message, strlen(error_message));
                 
-                free(arguments);
-                free(infile);
-                free(outfile);
-                free(arg);
+                if(arguments != NULL){
+                //    free(arguments);
+                }
+                if(infile != NULL){
+                   // free(infile);
+                }
+                if(outfile != NULL){
+                   // free(outfile);
+                }
                 return;
             }
             arguments[i]= arg;
-            free(arg);
+//            free(arg);
         }
     }
     int pid;
-    
+    int pid2= -1;
+    int pipefd[2];
+    pipe(pipefd); 
     pid= fork();
     if(pid == 0){
+        //child of first fork
         //out redirection
         if(out_redirection == 1){
             fd = open(outfile, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR);
@@ -124,7 +136,16 @@ void execfunc(char* command){
             fd = open(infile, O_RDONLY);
             if(fd == -1){
                 write(STDERR_FILENO, error_message, strlen(error_message));
-                free(arguments);
+                if(arguments != NULL){
+                //    free(arguments);
+                }
+                if(infile != NULL){
+                  //  free(infile);
+                }
+                if(outfile != NULL){
+                   // free(outfile);
+                }
+                
                 exit(0);
             }
             dup2(fd, STDIN_FILENO);
@@ -134,8 +155,7 @@ void execfunc(char* command){
        
         // pipeline
         if(pipeBool == 1){
-            int pid2;
-            int pipefd[2];
+            //RHS
             char** rhs_arguments = (char**) malloc(sizeof(char*)* 64);
             for(i=0;i<256;i++){
                 char* arg = (char*) malloc(128);
@@ -146,90 +166,142 @@ void execfunc(char* command){
                     break;
                 }else{ 
                      rhs_arguments[i]= arg;
-                     free(arg);
+//                     free(arg);
                 }
             }
+
+
             if(rhs_arguments[0] == NULL){
                 write(STDERR_FILENO, error_message, strlen(error_message));
                 
+                if(arguments != NULL){
+                 //   free(arguments);
+                }
+                if(outfile != NULL){
+                   // free(infile);
+                }
+                if(outfile != NULL){
+                    //free(outfile);
+                }
+                kill(getpid(), SIGINT);
+            }
+
+
+
+            close(pipefd[1]);
+            dup2(pipefd[0], STDIN_FILENO);
+            if(execvp(rhs_arguments[0], rhs_arguments)){
+                write(STDERR_FILENO, error_message, strlen(error_message));
+                if(arguments != NULL){
+                 //free(arguments);
+                }
+                if(infile != NULL){
+                   //     free(infile);
+                }
+                if(outfile != NULL){
+                     //   free(outfile);
+                }
+                if(rhs_arguments != NULL){
+                       // free(rhs_arguments);
+                }
+                kill(getpid(), SIGINT);
+            }
                 free(arguments);
                 free(infile);
                 free(outfile);
-                kill(getpid(), SIGINT);
-            }
-            pipe(pipefd);
-            pid2 = fork();
+                free(rhs_arguments);
             
-            if(pid2 == 0){
-                close(pipefd[1]);
-                dup2(pipefd[0], STDIN_FILENO);
-                if(execvp(rhs_arguments[0], rhs_arguments)){
-                    write(STDERR_FILENO, error_message, strlen(error_message));
-                    free(arguments);
-                    free(infile);
-                    free(outfile);
-                    free(rhs_arguments);
-                    kill(getpid(), SIGINT);
-                }
-                //free(arguments);
-                //free(infile);
-                //free(outfile);
-                //free(rhs_arguments);
-                exit(0);
+
+            exit(0);
                 
-            }else{
-                close(pipefd[0]);
-                dup2(pipefd[1], STDOUT_FILENO);
-                if(execvp(command,arguments)){
-                    write(STDERR_FILENO, error_message, strlen(error_message));
-                    free(arguments);
-                    free(infile);
-                    free(outfile);
-                    free(rhs_arguments);
-                    kill(getpid(), SIGINT);
-                }
-                close(pipefd[1]);
-                //free(arguments);
-                //free(infile);
-                //free(outfile);
-                //free(rhs_arguments);
-                exit(0);
-            }
                 
             
         }else{
             //regular process
             if(execvp(command,arguments)){
                 write(STDERR_FILENO, error_message, strlen(error_message));
-                free(arguments);
-                free(infile);
-                free(outfile);
+                if(arguments != NULL){
+                   //  free(arguments);
+                }
+                if(infile != NULL){
+                 //    free(infile);
+                }
+                if(outfile != NULL){
+               //      free(outfile);
+                }
                 kill(getpid(), SIGINT);
             }
             if(!background){
-                free(arguments);
-                free(infile);
-                free(outfile);
+                if(arguments != NULL){
+                //     free(arguments);
+                }
+                if(infile != NULL){
+                  //   free(infile);
+                }
+                if(outfile != NULL){
+                   //  free(outfile);
+                }
                 exit(0);
             }
         }
 
-        
+            
     }else{
-        if(!background){
-            waitpid(pid,&status,0);
-        }else{
-            waitpid(pid, &status, WNOHANG);
-            if(status == 0){
-                processes[curr_process_index] = pid;
-                curr_process_index++; 
+        //parent of first fork
+
+          if(pipeBool == 1){
+            pid2 = fork();
+            //second child 
+            if(pid2 == 0){
+                //LHS
+                close(pipefd[0]);
+                dup2(pipefd[1], STDOUT_FILENO);
+                if(execvp(command,arguments)){
+                    write(STDERR_FILENO, error_message, strlen(error_message));
+                    if(arguments != NULL){
+                  //      free(arguments);
+                    }
+                    if(infile != NULL){
+                  //      free(infile);
+                    }
+                    if(outfile != NULL){
+                  //      free(outfile);
+                    }
+                    kill(getpid(), SIGINT);
+                }
+                //free(arguments);
+                //free(infile);
+                //free(outfile);
+                //free(rhs_arguments);
+                exit(0);
+            }else{
+                //parent
+                waitpid(pid2, NULL, 0);
+                
+                close(pipefd[1]);
+                close(pipefd[0]);
             }
+            
+          }
+          
+          if(!background){
+            waitpid(pid,NULL,0);
+          }else{
+            processes[curr_process_index] = pid;
+            curr_process_index++; 
+            
         }
 
     }
-    free(infile);
-    free(outfile);
-    free(arguments);
+    if(arguments != NULL){
+        // free(arguments);
+    }
+    if(infile != NULL){
+        // free(infile);
+    }
+    if(outfile != NULL){
+      //  free(outfile);
+    }
 }
 
 void exitfunc(){
@@ -268,7 +340,6 @@ int main(int argc, char* argv[]){
         
         char* command = strtok(input, " \n\t");
         if(command == NULL){
-            free(input);
             continue;
         }
         else if(strcmp(command, "exit") == 0)

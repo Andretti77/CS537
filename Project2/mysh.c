@@ -13,12 +13,92 @@
 char error_message[30] = "An error has occurred\n";
 int* processes; 
 int curr_process_index = 0;
+
+void pipefunc(char** arguments){
+
+    int pipefd[2];
+    pipe(pipefd);
+    int pid, pid2,i;
+
+    pid = fork();
+
+    if(pid ==0){ 
+        //LHS
+        close(pipefd[0]);
+        dup2(pipefd[1], STDOUT_FILENO);
+        if(execvp(arguments[0],arguments)){
+            write(STDERR_FILENO, error_message, strlen(error_message));
+            
+            kill(getpid(), SIGINT);
+        }
+        //free(arguments);
+        //free(infile);
+        //free(outfile);
+        //free(rhs_arguments);
+        exit(0);
+    }
+
+
+    pid2 = fork();
+    //second child 
+    if(pid2 == 0){
+        //RHS
+        char** rhs_arguments = (char**) malloc(sizeof(char*)* 64);
+        for(i=0;i<256;i++){
+            char* arg = (char*) malloc(128);
+            arg = strtok(NULL, " \n\t");
+
+            if(arg == NULL){
+                rhs_arguments[i]= arg;
+                break;
+            }else{ 
+                rhs_arguments[i]= arg;
+                //                     free(arg);
+            }
+        }
+
+
+        if(rhs_arguments[0] == NULL){
+            write(STDERR_FILENO, error_message, strlen(error_message));
+
+          
+            kill(getpid(), SIGINT);
+        }
+
+
+
+        close(pipefd[1]);
+        dup2(pipefd[0], STDIN_FILENO);
+        if(execvp(rhs_arguments[0], rhs_arguments)){
+            write(STDERR_FILENO, error_message, strlen(error_message));
+           
+            kill(getpid(), SIGINT);
+        }
+        
+        exit(0);
+    }
+    //parent
+    close(pipefd[1]);
+    close(pipefd[0]);
+    waitpid(-1, NULL, 0);
+    // waitpid(pid2, NULL, 0);
+
+    if(waitpid(pid, NULL, WNOHANG) == 0){
+
+        kill(pid, SIGKILL);
+    }
+
+    waitpid(-1,NULL, 0);
+
+
+}
+
 void cdfunc(){
     char* directory = strtok(NULL, " \n\t");
     if(directory == NULL){
         directory = getenv("HOME");
         chdir(directory);
-        
+
     }else if(directory[0] == '/'){
         chdir(directory);    
         if(chdir(directory) == -1)
@@ -37,8 +117,8 @@ void cdfunc(){
 void pwdfunc(){
     char* directory = (char*)malloc(sizeof(char)*124);
     if(strtok(NULL, " \n\t") != NULL){
-       write(STDERR_FILENO, error_message, strlen(error_message));
-       return;
+        write(STDERR_FILENO, error_message, strlen(error_message));
+        return;
     }
     getcwd(directory, 124);
     printf("%s\n",directory);
@@ -46,7 +126,7 @@ void pwdfunc(){
 }
 
 void execfunc(char* command){
-    
+
     int i;
     int fd;
     int out_redirection = 0;
@@ -57,7 +137,7 @@ void execfunc(char* command){
     char* outfile = (char*) malloc(sizeof(char)*128);
     char** arguments = (char**) malloc(64*sizeof(char*));
     arguments[0] = command;
-    
+
     for(i=1; i<256; i++){
         char* arg = (char*) malloc(128);
         arg = strtok(NULL, " \n");
@@ -71,10 +151,10 @@ void execfunc(char* command){
             if(outfile == NULL){
                 write(STDERR_FILENO, error_message, strlen(error_message));
                 if(arguments != NULL){
-                   // free(arguments);
+                    // free(arguments);
                 }
                 if(infile != NULL){
-                   // free(infile);
+                    // free(infile);
                 }
                 return;
             }
@@ -84,10 +164,10 @@ void execfunc(char* command){
             if(infile == NULL){
                 write(STDERR_FILENO, error_message, strlen(error_message));
                 if(arguments != NULL){
-                  //  free(arguments);
+                    //  free(arguments);
                 }
                 if(outfile != NULL){
-                   // free(outfile);
+                    // free(outfile);
                 }
                 return;
             }
@@ -101,198 +181,104 @@ void execfunc(char* command){
         else{
             if(in_redirection == 1 || out_redirection == 1){
                 write(STDERR_FILENO, error_message, strlen(error_message));
-                
+
                 if(arguments != NULL){
-                //    free(arguments);
+                    //    free(arguments);
                 }
                 if(infile != NULL){
-                   // free(infile);
+                    // free(infile);
                 }
                 if(outfile != NULL){
-                   // free(outfile);
+                    // free(outfile);
                 }
                 return;
             }
             arguments[i]= arg;
-//            free(arg);
+            //            free(arg);
         }
     }
-    int pid;
-    int pid2= -1;
-    int pipefd[2];
-    pipe(pipefd); 
-    pid= fork();
-    if(pid == 0){
-        //child of first fork
-        //out redirection
-        if(out_redirection == 1){
-            fd = open(outfile, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR);
-            dup2(fd, 1);
-            close(fd);
-        }
-        
-        //in redirection
-        if(in_redirection == 1){
-            fd = open(infile, O_RDONLY);
-            if(fd == -1){
-                write(STDERR_FILENO, error_message, strlen(error_message));
-                if(arguments != NULL){
-                //    free(arguments);
-                }
-                if(infile != NULL){
-                  //  free(infile);
-                }
-                if(outfile != NULL){
-                   // free(outfile);
-                }
-                
-                exit(0);
-            }
-            dup2(fd, STDIN_FILENO);
-            close(fd);
-        }
 
-       
-        // pipeline
-        if(pipeBool == 1){
-            //RHS
-            char** rhs_arguments = (char**) malloc(sizeof(char*)* 64);
-            for(i=0;i<256;i++){
-                char* arg = (char*) malloc(128);
-                arg = strtok(NULL, " \n\t");
-                
-                if(arg == NULL){
-                    rhs_arguments[i]= arg;
-                    break;
-                }else{ 
-                     rhs_arguments[i]= arg;
-//                     free(arg);
-                }
+    if(pipeBool == 1){
+        pipefunc(arguments);
+    }else{
+        int pid;
+        pid= fork();
+        if(pid == 0){
+            //child of first fork
+            //out redirection
+            if(out_redirection == 1){
+                fd = open(outfile, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR);
+                dup2(fd, 1);
+                close(fd);
             }
 
+            //in redirection
+            if(in_redirection == 1){
+                fd = open(infile, O_RDONLY);
+                if(fd == -1){
+                    write(STDERR_FILENO, error_message, strlen(error_message));
+                    if(arguments != NULL){
+                        //    free(arguments);
+                    }
+                    if(infile != NULL){
+                        //  free(infile);
+                    }
+                    if(outfile != NULL){
+                        // free(outfile);
+                    }
 
-            if(rhs_arguments[0] == NULL){
-                write(STDERR_FILENO, error_message, strlen(error_message));
-                
-                if(arguments != NULL){
-                 //   free(arguments);
+                    exit(0);
                 }
-                if(outfile != NULL){
-                   // free(infile);
-                }
-                if(outfile != NULL){
-                    //free(outfile);
-                }
-                kill(getpid(), SIGINT);
+                dup2(fd, STDIN_FILENO);
+                close(fd);
             }
 
 
 
-            close(pipefd[1]);
-            dup2(pipefd[0], STDIN_FILENO);
-            if(execvp(rhs_arguments[0], rhs_arguments)){
-                write(STDERR_FILENO, error_message, strlen(error_message));
-                if(arguments != NULL){
-                 //free(arguments);
-                }
-                if(infile != NULL){
-                   //     free(infile);
-                }
-                if(outfile != NULL){
-                     //   free(outfile);
-                }
-                if(rhs_arguments != NULL){
-                       // free(rhs_arguments);
-                }
-                kill(getpid(), SIGINT);
-            }
-                free(arguments);
-                free(infile);
-                free(outfile);
-                free(rhs_arguments);
-            
-
-            exit(0);
-                
-                
-            
-        }else{
             //regular process
             if(execvp(command,arguments)){
                 write(STDERR_FILENO, error_message, strlen(error_message));
                 if(arguments != NULL){
-                   //  free(arguments);
+                    //  free(arguments);
                 }
                 if(infile != NULL){
-                 //    free(infile);
+                    //    free(infile);
                 }
                 if(outfile != NULL){
-               //      free(outfile);
+                    //      free(outfile);
                 }
                 kill(getpid(), SIGINT);
             }
             if(!background){
                 if(arguments != NULL){
-                //     free(arguments);
+                    //     free(arguments);
                 }
                 if(infile != NULL){
-                  //   free(infile);
+                    //   free(infile);
                 }
                 if(outfile != NULL){
-                   //  free(outfile);
+                    //  free(outfile);
                 }
                 exit(0);
             }
-        }
 
-            
-    }else{
-        //parent of first fork
 
-          if(pipeBool == 1){
-            pid2 = fork();
-            //second child 
-            if(pid2 == 0){
-                //LHS
-                close(pipefd[0]);
-                dup2(pipefd[1], STDOUT_FILENO);
-                if(execvp(command,arguments)){
-                    write(STDERR_FILENO, error_message, strlen(error_message));
-                    if(arguments != NULL){
-                  //      free(arguments);
-                    }
-                    if(infile != NULL){
-                  //      free(infile);
-                    }
-                    if(outfile != NULL){
-                  //      free(outfile);
-                    }
-                    kill(getpid(), SIGINT);
-                }
-                //free(arguments);
-                //free(infile);
-                //free(outfile);
-                //free(rhs_arguments);
-                exit(0);
+        }else{
+            //parent of first fork
+
+
+            if(!background){
+                waitpid(pid,NULL,0);
             }else{
-                //parent
-                waitpid(pid2, NULL, 0);
-                
-                close(pipefd[1]);
-                close(pipefd[0]);
+                processes[curr_process_index] = pid;
+                curr_process_index++; 
+
             }
-            
-          }
-          
-          if(!background){
-            waitpid(pid,NULL,0);
-          }else{
-            processes[curr_process_index] = pid;
-            curr_process_index++; 
-            
+
         }
 
     }
+
     if(arguments != NULL){
         // free(arguments);
     }
@@ -300,9 +286,11 @@ void execfunc(char* command){
         // free(infile);
     }
     if(outfile != NULL){
-      //  free(outfile);
+        //  free(outfile);
     }
 }
+
+
 
 void exitfunc(){
 
@@ -337,7 +325,7 @@ int main(int argc, char* argv[]){
             continue;
         }
 
-        
+
         char* command = strtok(input, " \n\t");
         if(command == NULL){
             continue;
@@ -350,10 +338,10 @@ int main(int argc, char* argv[]){
             pwdfunc();
         else
             execfunc(command);
-            
+
         free(input);
         command_num++;
-        
+
     }
 }
 

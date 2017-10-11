@@ -12,19 +12,6 @@ struct {
   struct proc proc[NPROC];
 } ptable;
 
-typedef struct queues { 
-  struct proc level3[64];
-  struct proc level2[64];
-  struct proc level1[64];
-  struct proc level0[64];
-  int level3_end;
-  int level2_end;
-  int level1_end;
-  int level0_end;
-} queues;
-
-static queues *MLFQ;
-
 static struct proc *initproc;
 
 int nextpid = 1;
@@ -59,6 +46,15 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->priority = 3;
+  p->ticks[3] = 0;
+  p->ticks[2] = 0;
+  p->ticks[1] = 0;
+  p->ticks[0] = 0;
+  p->wait_ticks[3] = 0;
+  p->wait_ticks[2] = 0;
+  p->wait_ticks[1] = 0;
+  p->wait_ticks[0] = 0;
   release(&ptable.lock);
 
   // Allocate kernel stack if possible.
@@ -81,8 +77,6 @@ found:
   p->context = (struct context*)sp;
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
-  p->priority = 3;
-  p->ticks[3] = 0;
 
   return p;
 }
@@ -91,7 +85,6 @@ found:
 void
 userinit(void)
 {
-        
   struct proc *p;
   extern char _binary_initcode_start[], _binary_initcode_size[];
   
@@ -115,7 +108,6 @@ userinit(void)
   p->cwd = namei("/");
 
   p->state = RUNNABLE;
-  MLFQ -> level3[0] = *p;
   release(&ptable.lock);
 }
 
@@ -214,7 +206,6 @@ exit(void)
     }
   }
 
-
   // Jump into the scheduler, never to return.
   proc->state = ZOMBIE;
   sched();
@@ -282,28 +273,78 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
+    int maxTicks[4] = {0, 32, 16, 8};
+    int highestPriority = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
+		if(p->priority > highestPriority)
+			highestPriority = p->priority;
+	}
+	struct proc* currQueue[64];
+	int currIndx = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+		if(p->priority == highestPriority){
+			currQueue[currIndx] = p;
+			currIndx++;
+		}else
+			p->wait_ticks[p->priority]++;
+		
+	}
 
-      // Switch to chosen process.  It is the process's job
+	int i;
+	for(i = 0; i < currIndx; i++){
+		p = currQueue[i];
+
+      	if(p->state != RUNNABLE)
+        	continue;
+		if(highestPriority != 0){
+			p->ticks[highestPriority]++;
+      		if(p->ticks[highestPriority] >= maxTicks[highestPriority])
+				p->priority--;
+		}
+	  // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
-      proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-      swtch(&cpu->scheduler, proc->context);
-      switchkvm();
+      	proc = p;
+      	switchuvm(p);
+      	p->state = RUNNING;
+      	swtch(&cpu->scheduler, proc->context);
+      	switchkvm();
 
       // Process is done running for now.
       // It should have changed its p->state before coming back.
-      proc = 0;
+      	proc = 0;
     }
     release(&ptable.lock);
 
   }
 }
+int 
+getpinfo(struct pstat* pr_stat)
+{
+    struct proc* p;
+    int i = 0;
+    acquire(&ptable.lock);
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+        if(p->state != UNUSED)        
+            pr_stat->inuse[i] = 1;
+        else
+            pr_stat->inuse[i] = 0;
+        
+        pr_stat->pid[i] = p->pid;
+        pr_stat->priority[i] = p->priority;
+        pr_stat->state[i] = p->state;
+        int j;
+        for(j=0; j<4; j++){
+            pr_stat->ticks[i][j] = p->ticks[j];
+            pr_stat->wait_ticks[i][j] = p->wait_ticks[j];
+        }
+        i++;
+    }
 
+    release(&ptable.lock);    
+
+    return 0;
+}
 // Enter scheduler.  Must hold only ptable.lock
 // and have changed proc->state.
 void
@@ -462,30 +503,4 @@ procdump(void)
   }
 }
 
-int getpinfo(struct pstat *pr_stat){
-    struct proc p;
-    int i;
-    acquire(&ptable.lock);
-    for(i =0; i<NPROC; i++){
-        p = ptable.proc[i];
-        if(p.state != SLEEPING || p.state != RUNNING)        
-            pr_stat->inuse[i] = 1;
-        else{
-            pr_stat->inuse[i] = 0;
-            continue;
-        }
-        pr_stat->pid[i] = p.pid;
-        pr_stat->priority[i] = p.priority;
-        pr_stat->state[i] = p.state;
-        int j;
-        for(j=0; j<4; j++){
-            pr_stat->ticks[i][j] = p.ticks[j];
-            pr_stat->wait_ticks[i][j] = p.wait_ticks[j];
-        }
 
-    }
-
-    release(&ptable.lock);    
-
-    return 0;
-}

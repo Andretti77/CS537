@@ -6,6 +6,8 @@
 #include "proc.h"
 #include "sysfunc.h"
 #include "pstat.h"
+
+
 int
 sys_fork(void)
 {
@@ -40,18 +42,7 @@ sys_getpid(void)
 {
   return proc->pid;
 }
-//added code here for Project 1
-int
-sys_getppid(void)
-{
 
- if(proc->parent != NULL){
-   return proc->parent->pid;
- }else{
-   return -1;
- }
-
-}
 int
 sys_sbrk(void)
 {
@@ -86,22 +77,15 @@ sys_sleep(void)
   release(&tickslock);
   return 0;
 }
-
 int
 sys_getpinfo(void)
 {
-    struct pstat* pr_stat;
-
-    //if(argptr(0,(char**) pr_stat,sizeof(pr_stat)) < 0)
-      // return -1;
-
-    return getpinfo(pr_stat);
-        
-    
-
-
+  struct pstat* pr_stat;
+  if(argptr(0,(char**) &pr_stat, sizeof(pr_stat) < 0)){
+    return -1;
+  }
+  return getpinfo(pr_stat);
 }
-
 // return how many clock tick interrupts have occurred
 // since boot.
 int

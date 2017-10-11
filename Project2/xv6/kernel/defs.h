@@ -9,7 +9,9 @@ struct pipe;
 struct proc;
 struct spinlock;
 struct stat;
+
 struct pstat;
+
 // bio.c
 void            binit(void);
 struct buf*     bread(uint, uint);
@@ -98,6 +100,7 @@ int             pipewrite(struct pipe*, char*, int);
 struct proc*    copyproc(struct proc*);
 void            exit(void);
 int             fork(void);
+int		getpinfo(struct pstat*);
 int             growproc(int);
 int             kill(int);
 void            pinit(void);
@@ -109,7 +112,6 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
-int             getpinfo(struct pstat*);
 
 // swtch.S
 void            swtch(struct context**, struct context*);
@@ -142,11 +144,8 @@ void            syscall(void);
 
 // timer.c
 void            timerinit(void);
-extern uint     ticks;
-void            tvinit(void);
-extern struct spinlock tickslock;
 
-//trap.c
+// trap.c
 void            idtinit(void);
 extern uint     ticks;
 void            tvinit(void);
@@ -172,6 +171,7 @@ pde_t*          copyuvm(pde_t*, uint);
 void            switchuvm(struct proc*);
 void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
+
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
 

@@ -5,6 +5,7 @@ USER_PROGS := \
 	echo\
 	forktest\
 	grep\
+	getpinfo\
 	init\
 	kill\
 	ln\

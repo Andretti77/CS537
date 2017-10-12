@@ -81,7 +81,7 @@ int
 sys_getpinfo(void)
 {
   struct pstat* pr_stat;
-  if(argptr(0,(char**) &pr_stat, sizeof(pr_stat) < 0)){
+  if(argptr(0,(void *) &pr_stat, sizeof(pr_stat) < 0)){
     return -1;
   }
   return getpinfo(pr_stat);

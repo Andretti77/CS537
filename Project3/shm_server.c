@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <sys/mman.h>
+#include <string.h>
+#include <signal.h>
 // ADD NECESSARY HEADERS
 #define SHM_NAME "petti_klisch"
 #define PAGESIZE 4096
@@ -32,7 +34,14 @@ void exit_handler(int sig)
 int main(int argc, char *argv[]) 
 {
     // ADD
-	
+	struct sigaction act;
+    memset(&act, '\0', sizeof(act));
+    act.sa_sigaction = &exit_handler;
+    act.sa_flags = SA_SIGINFO;
+
+    if(sigaction(SIGINT | SIGTERM, &act, NULL)<0){
+        return 1;
+    }
 	// Creating a new shared memory segment
 	int fd = shm_open(SHM_NAME, O_RDWR | O_CREAT, 0660);	
     if(fd == -1 )

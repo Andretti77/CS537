@@ -21,11 +21,15 @@ typedef struct{
     char birth[25];
     char clientString[10];
     int elapsed_sec;
-    double elapsed_msec;
-    int valid;
+    float elapsed_msec;
+    char valid;
+    int start_time;
+    float start_time_usec;
+    
 }stats_t;
 
 void* shm_ptr = NULL;
+stats_t* currClient = NULL; 
 
 static void exit_handler(int sig) {
     // ADD
@@ -34,14 +38,7 @@ static void exit_handler(int sig) {
 	pthread_mutex_lock(mutex);
 
     // Client leaving; needs to reset its segment   
-    for(int i = 0; i< MAXCLIENTS; i++){
-           stats_t* currClient = (stats_t*) (shm_ptr+i*64);
-            if(currClient->pid == getpid()){
-                memset(currClient , 0 , 64);
-                currClient->valid = 0;
-                break;
-            } 
-    }
+    currClient->valid = 0;
 	pthread_mutex_unlock(mutex);
 	// critical section ends
 
@@ -58,13 +55,17 @@ int main(int argc, char *argv[]) {
     if(sigaction(SIGINT, &act, NULL)<0)
         return 1; 
 
+    if(sigaction(SIGTERM, &act, NULL)<0)
+        return 1;
 
 	int fd = shm_open(SHMNAME, O_RDWR, 0660);
     if(fd == -1)
        exit(1);
+    
     shm_ptr = mmap(NULL, PAGESIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-    if(shm_ptr == NULL)
+    if(shm_ptr == (void*)-1)
         exit(1);
+    
     //time variables
     time_t tictoc;
     time(&tictoc);
@@ -72,46 +73,49 @@ int main(int argc, char *argv[]) {
     struct timeval time_start, time_curr;
     char time[25];
     now = localtime(&tictoc);
-
     strftime(time, 25, "%c", now);
+    gettimeofday(&time_start , NULL);    
+    
     // critical section begins
     mutex = (pthread_mutex_t*)shm_ptr;
     pthread_mutex_lock(mutex);
-    stats_t* currClient = NULL; 
 
 	// client updates available segment
     for(int i = 1; i<MAXCLIENTS; i++){
-        currClient = (stats_t *) (shm_ptr+i*64);
-        if(currClient -> valid == 0)
+        currClient = (stats_t *) (shm_ptr+64*i);
+        if(currClient -> valid == 0){
+	        currClient -> pid = getpid();
+            strcpy(currClient -> birth, time);
+            currClient -> elapsed_sec = 0;
+            currClient -> elapsed_msec = 0;
+            currClient -> valid = 1;
+            currClient -> start_time = time_start.tv_sec;
+            currClient -> start_time_usec = time_start.tv_usec;
+            strcpy(currClient -> clientString ,argv[1]);
             break;
+        }
     }
 
-	currClient -> pid = getpid();
-    strcpy(currClient -> birth, time);
-    currClient -> elapsed_sec = 0;
-    currClient -> elapsed_msec = 0;
-    currClient -> valid = 1;
-    strcpy(currClient -> clientString ,argv[1]);
 	pthread_mutex_unlock(mutex);
     // critical section ends
-    gettimeofday(&time_start , NULL);    
-	while (1) {
+
+    while (1) {
 		// ADD
+        sleep(1);
 		// Print active clients
         printf("Active clients: ");
         for(int i = 1; i<MAXCLIENTS; i++){
-            pthread_mutex_lock(mutex);
-            currClient = (stats_t*) (shm_ptr+i*64);
-            if(currClient->valid == 1){
+//            pthread_mutex_lock(mutex);
+            stats_t* currClient_temp = (stats_t*) (shm_ptr+64*i);
+            if(currClient_temp->valid == 1){
                 gettimeofday(&time_curr, NULL);
-                printf("%d", currClient->pid);
-                currClient -> elapsed_sec++;
-                currClient -> elapsed_msec = (time_curr.tv_sec - time_start.tv_sec)/100.0;
+                printf("%d ", currClient_temp->pid);
+                currClient_temp -> elapsed_sec = time_curr.tv_sec - currClient_temp -> start_time;
+                currClient_temp -> elapsed_msec = (time_curr.tv_usec - currClient_temp -> start_time_usec)/100.0;
             }
-            pthread_mutex_unlock(mutex);
+  //          pthread_mutex_unlock(mutex);
         } 
         printf("\n");
-        sleep(1);
 
     }
 

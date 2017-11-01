@@ -19,8 +19,10 @@ typedef struct {
     char birth[25];
     char clientString[10];
     int elapsed_sec;
-    double elapsed_msec;
-    int valid;
+    float elapsed_msec;
+    char valid;
+    int start_time;
+    float start_time_usec;
 } stats_t;
 
 void * shm_ptr = NULL;
@@ -48,11 +50,17 @@ int main(int argc, char *argv[])
     if(sigaction(SIGINT, &act, NULL)<0){
         return 1;
     }
-	// Creating a new shared memory segment
+
+    if(sigaction(SIGTERM, &act, NULL)<0)
+        return 1;
+
+    // Creating a new shared memory segment
 	int fd = shm_open(SHM_NAME, O_RDWR | O_CREAT, 0660);	
     if(fd == -1 )
         exit(1);
+
     ftruncate(fd, PAGESIZE);
+
     shm_ptr =  mmap(NULL, PAGESIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd ,0);
     if(shm_ptr == (void*) -1)
         exit(1);
@@ -66,10 +74,12 @@ int main(int argc, char *argv[])
    
     int i;
     for(i = 1; i<MAXCLIENTS; i++){
-        stats_t* currClient = (stats_t*) (shm_ptr+i*64);
+        stats_t* currClient = (stats_t*) (shm_ptr+64*i);
         currClient -> valid = 0;
     }
+
     int j = 1;
+
     while (1) 
 	{
         
@@ -77,17 +87,18 @@ int main(int argc, char *argv[])
         for(i = 1; i<MAXCLIENTS; i++){
 
             pthread_mutex_lock(mutex);
-            stats_t* currClient = (stats_t*) (shm_ptr+i*64);
+            stats_t* currClient = (stats_t*) (shm_ptr+64*i);
 
             if(currClient->valid == 1){
                 numClients++;
                 printf("%d, pid : %d, birth : %s, elapsed : %d s %.4f ms, %s\n",
                         j, currClient->pid, currClient->birth, currClient->elapsed_sec, currClient->elapsed_msec, currClient->clientString);
             
-            j++;
             }
             pthread_mutex_unlock(mutex);
         }
+
+        j++;
         numClients = 0;
         sleep(1);
     }

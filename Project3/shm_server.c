@@ -15,17 +15,15 @@ pthread_mutex_t* mutex;
 pthread_mutexattr_t mutexAttribute;
 
 typedef struct { 
+    char valid;
     int pid;
     char birth[25];
     char clientString[10];
     int elapsed_sec;
     float elapsed_msec;
-    char valid;
-    int start_time;
-    float start_time_usec;
 } stats_t;
 
-void * shm_ptr = NULL;
+stats_t* shm_ptr = NULL;
 
 int numClients=0;
 static void exit_handler(int sig) 
@@ -59,10 +57,12 @@ int main(int argc, char *argv[])
     if(fd == -1 )
         exit(1);
 
-    ftruncate(fd, PAGESIZE);
+    int t =  ftruncate(fd, PAGESIZE);
+    if(t == -1)
+        exit(1);
 
-    shm_ptr =  mmap(NULL, PAGESIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd ,0);
-    if(shm_ptr == (void*) -1)
+    shm_ptr = (stats_t *) mmap(NULL, PAGESIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd ,0);
+    if(shm_ptr == (void *) -1 )
         exit(1);
 
     mutex = (pthread_mutex_t*) shm_ptr;
@@ -73,23 +73,25 @@ int main(int argc, char *argv[])
     pthread_mutex_init(mutex, &mutexAttribute);
    
     int i;
-    for(i = 1; i<MAXCLIENTS; i++){
-        pthread_mutex_lock(mutex);
-        stats_t* currClient = (stats_t*) (shm_ptr+64*i);
-        currClient -> valid = 0;
-        pthread_mutex_unlock(mutex);
-    }
+//    for(i = 1; i<MAXCLIENTS; i++){
+  //      pthread_mutex_lock(mutex);
+      //  stats_t* currClient = (stats_t*) (shm_ptr+64*i);
+    //    currClient -> valid = 0;
+       // pthread_mutex_unlock(mutex);
+   // }
 
     int j = 1;
 
     while (1) 
 	{
         
+        sleep(1);
 		// ADD
+        
+       //     pthread_mutex_lock(mutex);
         for(i = 1; i<MAXCLIENTS; i++){
 
-            pthread_mutex_lock(mutex);
-            stats_t* currClient = (stats_t*) (shm_ptr+64*i);
+            stats_t* currClient =  ((void*)shm_ptr+i*64);
 
             if(currClient->valid == 1){
                 numClients++;
@@ -97,12 +99,11 @@ int main(int argc, char *argv[])
                         j, currClient->pid, currClient->birth, currClient->elapsed_sec, currClient->elapsed_msec, currClient->clientString);
             
             }
-            pthread_mutex_unlock(mutex);
         }
 
+         //   pthread_mutex_unlock(mutex);
         j++;
-        numClients = 0;
-        sleep(1);
+//        numClients = 0;
     }
 
     return 0;

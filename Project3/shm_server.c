@@ -74,8 +74,10 @@ int main(int argc, char *argv[])
    
     int i;
     for(i = 1; i<MAXCLIENTS; i++){
+        pthread_mutex_lock(mutex);
         stats_t* currClient = (stats_t*) (shm_ptr+64*i);
         currClient -> valid = 0;
+        pthread_mutex_unlock(mutex);
     }
 
     int j = 1;

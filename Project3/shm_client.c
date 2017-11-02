@@ -46,7 +46,11 @@ static void exit_handler(int sig) {
 }
 
 int main(int argc, char *argv[]) {
-	// ADD 
+	// ADD
+
+
+    if(argc>2)
+        exit(1);
     struct sigaction act;
     memset(&act, '\0', sizeof(act));
     act.sa_handler = exit_handler;
@@ -78,10 +82,10 @@ int main(int argc, char *argv[]) {
     
     // critical section begins
     mutex = (pthread_mutex_t*)shm_ptr;
-    pthread_mutex_lock(mutex);
 
 	// client updates available segment
     for(int i = 1; i<MAXCLIENTS; i++){
+        pthread_mutex_lock(mutex);
         currClient = (stats_t *) (shm_ptr+64*i);
         if(currClient -> valid == 0){
 	        currClient -> pid = getpid();
@@ -92,11 +96,14 @@ int main(int argc, char *argv[]) {
             currClient -> start_time = time_start.tv_sec;
             currClient -> start_time_usec = time_start.tv_usec;
             strcpy(currClient -> clientString ,argv[1]);
+
+	        pthread_mutex_unlock(mutex);
             break;
         }
+
+	   pthread_mutex_unlock(mutex);
     }
 
-	pthread_mutex_unlock(mutex);
     // critical section ends
 
     while (1) {
@@ -105,7 +112,7 @@ int main(int argc, char *argv[]) {
 		// Print active clients
         printf("Active clients: ");
         for(int i = 1; i<MAXCLIENTS; i++){
-//            pthread_mutex_lock(mutex);
+            pthread_mutex_lock(mutex);
             stats_t* currClient_temp = (stats_t*) (shm_ptr+64*i);
             if(currClient_temp->valid == 1){
                 gettimeofday(&time_curr, NULL);
@@ -113,7 +120,7 @@ int main(int argc, char *argv[]) {
                 currClient_temp -> elapsed_sec = time_curr.tv_sec - currClient_temp -> start_time;
                 currClient_temp -> elapsed_msec = (time_curr.tv_usec - currClient_temp -> start_time_usec)/100.0;
             }
-  //          pthread_mutex_unlock(mutex);
+            pthread_mutex_unlock(mutex);
         } 
         printf("\n");
 

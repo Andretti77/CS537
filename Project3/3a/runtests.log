@@ -1,0 +1,49 @@
+starting build
+
+**********************************************************************
+
+Test build
+build project using make
+
+**********************************************************************
+Trying to clean project using make clean
+make clean
+rm shm_client shm_server
+Trying to build project using make
+make
+gcc shm_server.c -o shm_server -Wall -Werror -lrt -lpthread
+gcc shm_client.c -o shm_client -Wall -Werror -lrt -lpthread
+
+
+test build PASSED
+ (build project using make)
+
+starting client_without_server
+
+**********************************************************************
+
+Test client_without_server
+Client should exit gracefully if no server is running
+
+**********************************************************************
+
+
+test client_without_server PASSED (10 of 10)
+ (Client should exit gracefully if no server is running)
+
+starting one_client
+
+**********************************************************************
+
+Test one_client
+Test basic functionality for one client & server
+
+**********************************************************************
+
+
+test one_client FAILED (0 of 10)
+ (Test basic functionality for one client & server)
+ Timelimit (10.0s) exceeded
+
+Skipped 6 tests.
+To keep testing after failing a test, use flag '-c' or '--continue'

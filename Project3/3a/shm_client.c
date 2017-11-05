@@ -134,8 +134,6 @@ int main(int argc, char *argv[]) {
 				
 			}
 
-			//if (i >= 63)
-				//printf("\n");
 		}
 		printf("\n");
 		pthread_mutex_unlock(mutex);

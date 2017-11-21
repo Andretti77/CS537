@@ -37,6 +37,9 @@ void getargs(int *port, int argc, char *argv[], int* workers, int* buffers)
     *port = atoi(argv[1]);
     *workers = atoi(argv[2]);
     *buffers = atoi(argv[3]);
+
+    if(*workers <1  || *buffers < 1)
+        exit(1);
 }
 
 void put(void* arg, int value){

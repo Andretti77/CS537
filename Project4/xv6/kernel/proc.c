@@ -107,7 +107,7 @@ int
 growproc(int n)
 {
   uint sz;
-  
+  struct proc *p;
   sz = proc->sz;
   if(n > 0){
     if((sz = allocuvm(proc->pgdir, sz, sz + n)) == 0)
@@ -117,6 +117,10 @@ growproc(int n)
       return -1;
   }
   proc->sz = sz;
+	for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->parent != proc || p->pgdir == proc->pgdir)
+				p->sz = sz;
+	}
   switchuvm(proc);
   return 0;
 }
@@ -159,6 +163,85 @@ fork(void)
   return pid;
 }
 
+int
+clone(void(*fcn)(void*), void *arg, void *stack)
+{
+	int i, pid;
+  struct proc *np;
+	uint ustack[2];
+	uint sp;
+
+	// Allocate process.
+  if((np = allocproc()) == 0)
+    return -1;
+
+	np->pgdir = proc->pgdir;
+	np->sz = proc->sz;
+	np->parent = proc;
+	*np->tf = *proc->tf;
+
+	sp = (uint)stack + PGSIZE - 8;
+	ustack[0] = 0xffffffff;  // fake return PC
+  ustack[1] = (uint)arg;
+	if(copyout(np->pgdir, sp, ustack, 8) < 0)
+		return -1;
+
+	np->stack = stack;
+	np->tf->esp = sp;
+	np->tf->eip =	(uint)fcn;
+	
+	for(i = 0; i < NOFILE; i++)
+    if(proc->ofile[i])
+      np->ofile[i] = filedup(proc->ofile[i]);
+	np->cwd = idup(proc->cwd);
+ 
+  pid = np->pid;
+  np->state = RUNNABLE;
+  safestrcpy(np->name, proc->name, sizeof(proc->name));
+  return pid;
+}
+
+int
+join(void **stack)
+{
+	struct proc *p;
+  int havekids, pid;
+
+  acquire(&ptable.lock);
+  for(;;){
+    // Scan through table looking for zombie children.
+    havekids = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->parent != proc || p->pgdir != proc->pgdir)
+        continue;
+      havekids = 1;
+
+      if(p->state == ZOMBIE){
+        // Found one.
+        pid = p->pid;
+        kfree(p->kstack);
+        p->kstack = 0;
+        p->state = UNUSED;
+        p->pid = 0;
+        p->parent = 0;
+        p->name[0] = 0;
+        p->killed = 0;
+				*stack = p->stack;
+        release(&ptable.lock);
+        return pid;
+      }
+    }
+
+    // No point waiting if we don't have any children.
+    if(!havekids || proc->killed){
+      release(&ptable.lock);
+      return -1;
+    }
+
+    // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+    sleep(proc, &ptable.lock);  //DOC: wait-sleep
+		}
+}
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait() to find out it exited.
@@ -195,7 +278,6 @@ exit(void)
         wakeup1(initproc);
     }
   }
-
   // Jump into the scheduler, never to return.
   proc->state = ZOMBIE;
   sched();
@@ -215,7 +297,7 @@ wait(void)
     // Scan through table looking for zombie children.
     havekids = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->parent != proc)
+      if(p->parent != proc || p->pgdir == proc->pgdir)
         continue;
       havekids = 1;
       if(p->state == ZOMBIE){
@@ -241,7 +323,8 @@ wait(void)
     }
 
     // Wait for children to exit.  (See wakeup1 call in proc_exit.)
-    sleep(proc, &ptable.lock);  //DOC: wait-sleep
+    if(proc->state != SLEEPING)
+        sleep(proc, &ptable.lock);  //DOC: wait-sleep
   }
 }
 
@@ -441,6 +524,75 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+int
+cond_wait_k(cond_t *cond, lock_t *lock)
+{
+	while(xchg(&cond->lock, 1) != 0);
+	if(cond->lock == 0){
+		xchg(&cond->lock, 0);
+		panic("lock not acquired");  
+	}
+
+	if((cond->head - cond->tail == 1 || cond->tail - cond->head == 7) && cond->empty == 0){
+		xchg(&cond->lock, 0);    
+		panic("FULL QUEUE");
+	}
+	if(cond->tail == 7)
+		cond->tail = 0;
+	else
+		cond->tail++;
+
+	cond->queue[cond->tail] = proc;
+	cond->empty = 0;
+
+	xchg(lock, 0);
+	xchg(&cond->lock, 0); 
+	// Go to sleep.
+	acquire(&ptable.lock);
+	proc->state = SLEEPING;
+	sched();
+
+	release(&ptable.lock);
+  while(xchg(lock, 1) != 0);
+	return 1;
+}
+
+int
+cond_signal_k(cond_t *cond)
+{
+	acquire(&ptable.lock);
+	struct proc* p;
+	while(xchg(&cond->lock, 1) != 0);
+	if(cond->empty == 1){
+		release(&ptable.lock);
+		xchg(&cond->lock, 0);
+		return 1;
+	}
+	p = cond->queue[cond->head];
+	p->state = RUNNABLE;
+
+	if(cond->head == 7)
+		cond->head = 0;
+	else
+		cond->head++;
+
+	if(cond->tail - cond->head == 7 || cond->head - cond->tail == 1)
+		cond->empty = 1;
+
+	xchg(&cond->lock, 0);
+	release(&ptable.lock);
+	return 1;
+}
+
+int
+cond_init_k(cond_t *cond)
+{	
+	cond->head = 0;
+	cond->tail = 7;
+	cond->empty = 1;
+	cond->lock = 0;
+	return 1;
 }
 
 

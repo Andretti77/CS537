@@ -23,5 +23,10 @@ int sys_unlink(void);
 int sys_wait(void);
 int sys_write(void);
 int sys_uptime(void);
+int sys_clone(void);
+int sys_join(void);
+int sys_cond_wait_k(void);
+int sys_cond_signal_k(void);
+int sys_cond_init_k(void);
 
 #endif // _SYSFUNC_H_

@@ -11,6 +11,61 @@ sys_fork(void)
 {
   return fork();
 }
+int
+sys_clone(void)
+{
+	void *fcn;
+	void *arg;
+	void *stack;
+	
+	if(argptr(0, (void*)&fcn, sizeof(*fcn)) < 0)
+		return -1;
+	if(argptr(1, (void*)&arg, sizeof(*arg)) < 0)
+		return -1;
+	if(argptr(2, (void*)&stack, sizeof(*stack)) < 0)
+		return -1;
+	return clone(fcn, arg, stack);
+}
+
+int
+sys_join(void)
+{
+	void *stack;
+	if(argptr(0, (void*)&stack, sizeof(*stack)) < 0)
+		return -1;
+	
+	return join(stack);
+}
+
+int 
+sys_cond_wait_k(void)
+{
+		cond_t* cond;
+		lock_t* lock;
+		if(argptr(0, (void*)&cond, sizeof(*cond)) < 0)
+			return -1;
+		if(argptr(1, (void*)&lock, sizeof(*lock)) < 0)
+			return -1;
+		return cond_wait_k(cond,lock);
+}
+
+int
+sys_cond_signal_k(void)
+{
+		cond_t* cond;
+		if(argptr(0, (void*)&cond, sizeof(*cond)) < 0)
+			return -1;
+		return cond_signal_k(cond);
+}
+
+int
+sys_cond_init_k(void)
+{
+		cond_t* cond;
+		if(argptr(0, (void*)&cond, sizeof(*cond)) < 0)
+			return -1;
+		return cond_init_k(cond);
+}
 
 int
 sys_exit(void)

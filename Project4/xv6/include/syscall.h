@@ -23,5 +23,10 @@
 #define SYS_sbrk   19
 #define SYS_sleep  20
 #define SYS_uptime 21
+#define SYS_clone  22
+#define SYS_join   23
+#define SYS_cond_wait_k 24
+#define SYS_cond_signal_k 25
+#define SYS_cond_init_k 26
 
 #endif // _SYSCALL_H_

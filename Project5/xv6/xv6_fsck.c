@@ -23,7 +23,7 @@ int main(int argc, char* argv[]){
 
     
     int fd = open(argv[1], O_RDONLY);
-    if(fd <= 0){
+    if(fd < 0){
 		fprintf(stderr, "image not found.\n");
 		exit (1);
     }
@@ -170,6 +170,91 @@ int main(int argc, char* argv[]){
 	}
 
 
+
+    //#5
+    di = (struct dinode*) (img_ptr + (2*BSIZE));
+	
+	for(i = 0; i< sb->ninodes; i++){
+		if((di->type == T_DIR) || (di->type == T_FILE) || (di->type == T_DEV)){
+
+			int j;
+			for(j = 0; j< NDIRECT+1; j++){
+				if(di->addrs[j] != 0){
+				char* bitmap = (char*) (img_ptr +(BBLOCK(di->addrs[j], sb->ninodes) * BSIZE));
+				
+				int bi = di->addrs[j]%BPB;
+				int m = 1 << (bi %8);
+					if((m &bitmap[bi/8])== 0){
+						fprintf(stderr, "ERROR: address used by inode but marked free in bitmap.\n");
+						exit(1);
+					}
+						
+				}
+			}
+			if(di->addrs[NDIRECT] != 0){
+				uint* indir = (uint*)(img_ptr + (di->addrs[NDIRECT]*BSIZE));
+				for(int k = 0; k< NINDIRECT; k++){
+				char* bitmap = (char*) (img_ptr +(BBLOCK(*indir, sb->ninodes) * BSIZE));
+				int bi = *indir%BPB;
+				int m = 1 << (bi %8);
+					if((m &bitmap[bi/8])== 0){
+						fprintf(stderr, "ERROR: address used by inode but marked free in bitmap.\n");
+						exit(1);
+					}
+				indir++;
+				}
+			}
+			
+		}
+		di++;	
+	}
+
+
+   	//#6
+	printf("%lu\n", BBLOCK(2, sb->ninodes));
+   	char* bitmap = (char*) (img_ptr + (BBLOCK(2, sb->ninodes)*BSIZE));
+	int data_inuse = 0;
+	int data_inuse_in = 0;
+	for(int bi = 0; bi< BPB%sb->size; bi++){
+		int m = 1 <<(bi%8);
+		if((m & bitmap[bi/8]) == 1){
+			di = (struct dinode*) (img_ptr + bi*BSIZE);
+			for(i = 0; i<sb->ninodes; i++){
+				if((di->type == T_DIR) || (di->type == T_FILE) || (di->type == T_DEV)){			
+					int j;
+					for(j = 0; j<NDIRECT+1; j++){
+						if(di->addrs[j] == bi){
+							data_inuse = 1;
+						}
+					}
+					if(di->addrs[NDIRECT] != 0){
+						uint* indir = (uint*) (img_ptr + (di->addrs[NDIRECT] *BSIZE));
+						for(int k =0; k<NINDIRECT; k++){
+							if(*indir == bi){
+								data_inuse_in = 1;
+							}
+							indir++;
+						}
+					}
+				}
+
+
+			}
+	
+		}
+
+	}
+
+
+	int data_ok = data_inuse || data_inuse_in;
+
+	if(!data_ok){
+		fprintf(stderr,"ERROR: bitmap marks block in use but it is not in use.\n");
+		exit(1);
+
+	}
+
+	
 	
 
 }

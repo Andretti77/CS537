@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
-#include "include/fs.h"
+#include "xv6_fsck.h"
 
 #define T_DIR 1
 #define T_FILE 2
@@ -525,7 +525,7 @@ int main(int argc, char* argv[]){
 	
 
 	//#10
-/*
+
 	di = (struct dinode*) (img_ptr + (2*BSIZE));
 	for(i = 0; i< sb->ninodes; i++){
 		if(di->type == T_DIR){		
@@ -535,14 +535,14 @@ int main(int argc, char* argv[]){
 				for(int z = 0; z< DPB; z++){
 					int inode_num = dre->inum;
 					if(inode_num != 0){
-						struct dinode* di2 = (struct dinode*) (img_ptr + (IBLOCK(inode_num)*BSIZE));
-						for(int a = 0; a<inode_num; a++){						
-								di2++;
-						}
-						printf("inode number: %d. Block inode is in: %lu. Inode type: %d. directory entry name %s\n", inode_num, IBLOCK(inode_num), di2->type, dre->name);
-						if(di2->type == 0){
-							//fprintf(stderr, "ERROR: inode referred to in directory but marked free.\n");
-							//exit(1);
+						struct dinode* di2 = (struct dinode*) (img_ptr + (2*BSIZE));
+						for(int w = 0; w<sb->ninodes; w++){
+							
+							if((w == dre->inum) &&(di2->type == 0)){
+								fprintf(stderr, "ERROR: inode referred to in directory but marked free.\n");
+								exit(1);
+							}
+							di2++;
 						}
 					}
 					dre++;
@@ -557,12 +557,13 @@ int main(int argc, char* argv[]){
 					for(int g =0; g<DPB; g++){
 						int inode_num = dre->inum;
 						if(inode_num != 0){
-							struct dinode* di2 = (struct dinode*) (img_ptr + (IBLOCK(inode_num)*BSIZE));
-							di2 = di2 + inode_num;
-							//printf("INDIRECT: inode number: %d. Block inode is in: %lu. Inode type: %d.\n", inode_num, IBLOCK(inode_num), di2->type);
-							if(di2->type == 0){
-								//fprintf(stderr, "ERROR: inode referred to in directory but marked free.\n");
-								//exit(1);
+							struct dinode* di2 = (struct dinode*) (img_ptr + (2*BSIZE));
+							for(int w = 0; w<sb->ninodes; w++){
+								if((w == dre->inum) &&(di2->type == 0)){
+									fprintf(stderr, "ERROR: inode referred to in directory but marked free.\n");
+									exit(1);
+								}
+								di2++;
 							}
 						}
 						dre++;
@@ -573,13 +574,13 @@ int main(int argc, char* argv[]){
 
 			}
 		}
-		printf("ACTUAL: inode num :%d, block inode is in: %lu, inode type: %d\n", i , IBLOCK(i), di->type);
+		//printf("ACTUAL: inode num :%d, block inode is in: %lu, inode type: %d\n", i , IBLOCK(i), di->type);
 		di++;
 	}
 
 
 	
-*/
+
 
 
 

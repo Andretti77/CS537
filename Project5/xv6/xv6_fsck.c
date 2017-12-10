@@ -13,6 +13,76 @@
 #define T_FILE 2
 #define T_DEV 3
 #define DPB (BSIZE/sizeof(struct dirent))
+
+
+void duplicate_dir_address(uint addrs, void* img_ptr, struct superblock* sb,struct dinode* di ){
+
+	struct dinode* di2 = (struct dinode*) (img_ptr + (2*BSIZE));
+	for(int k = 0; k<sb->ninodes; k++){
+		if(di2 != di){
+			for(int l = 0; l<NDIRECT+1; l++){
+				if(di2->addrs[l] != 0){
+					if(di2->addrs[l] == addrs){
+						fprintf(stderr, "ERROR: direct address used more than once.\n");
+						exit(1);
+					}
+				}
+			}
+			
+			if(di2->addrs[NDIRECT] != 0){
+				uint* indir = (uint*) (img_ptr + (di2->addrs[NDIRECT] *BSIZE));
+				for(int z = 0; z< NINDIRECT; z++){
+					if(*indir != 0){
+						if(*indir == addrs){
+							fprintf(stderr, "ERROR: direct address used more than once.\n");
+							exit(1);
+						}
+					}
+					indir++;
+				}
+			}
+		}
+	di2++;
+
+	}
+
+
+}
+
+void duplicate_indir_address(uint addrs, void* img_ptr, struct superblock* sb,struct dinode* di ){
+
+	struct dinode* di2 = (struct dinode*) (img_ptr + (2*BSIZE));
+	for(int k = 0; k<sb->ninodes; k++){
+		if(di2 != di){
+			for(int l = 0; l<NDIRECT+1; l++){
+				if(di2->addrs[l] != 0){
+					if(di2->addrs[l] == addrs){
+						fprintf(stderr, "ERROR: indirect address used more than once.\n");
+						exit(1);
+					}
+				}
+			}
+			
+			if(di2->addrs[NDIRECT] != 0){
+				uint* indir = (uint*) (img_ptr + (di2->addrs[NDIRECT] *BSIZE));
+				for(int z = 0; z< NINDIRECT; z++){
+					if(*indir != 0){
+						if(*indir == addrs){
+							fprintf(stderr, "ERROR: indirect address used more than once.\n");
+							exit(1);
+						}
+					}
+					indir++;
+				}
+			}
+		}
+	di2++;
+
+	}
+
+
+}
+
 int main(int argc, char* argv[]){
 
 
@@ -211,20 +281,29 @@ int main(int argc, char* argv[]){
 
 
    	//#6
-	printf("%lu\n", BBLOCK(2, sb->ninodes));
-   	char* bitmap = (char*) (img_ptr + (BBLOCK(2, sb->ninodes)*BSIZE));
-	int data_inuse = 0;
-	int data_inuse_in = 0;
-	for(int bi = 0; bi< BPB%sb->size; bi++){
-		int m = 1 <<(bi%8);
-		if((m & bitmap[bi/8]) == 1){
-			di = (struct dinode*) (img_ptr + bi*BSIZE);
+	
+   	
+	int data_inuse ;
+	int data_inuse_in;
+	//printf("%d", BPB%sb->size);
+	for(uint bi = sb->size - sb->nblocks; bi< BPB; bi++){
+		data_inuse = 0;
+		data_inuse_in = 0;
+		char* bitmap = (char*) (img_ptr + (BBLOCK(bi, sb->ninodes)*BSIZE));
+		int m = 1 <<((bi%BPB)%8);
+		//printf("bit index: %d, bit in bitmap %u\n", bi, m&bitmap[bi/8]);
+		if((m & bitmap[(bi%BPB)/8]) != 0){
+			di = (struct dinode*) (img_ptr + (2*BSIZE));
 			for(i = 0; i<sb->ninodes; i++){
 				if((di->type == T_DIR) || (di->type == T_FILE) || (di->type == T_DEV)){			
 					int j;
 					for(j = 0; j<NDIRECT+1; j++){
+						
 						if(di->addrs[j] == bi){
+							//printf("BLOCK NUMBER %d, bit index %d\n", di->addrs[j], bi);
 							data_inuse = 1;
+							break;
+							
 						}
 					}
 					if(di->addrs[NDIRECT] != 0){
@@ -232,29 +311,182 @@ int main(int argc, char* argv[]){
 						for(int k =0; k<NINDIRECT; k++){
 							if(*indir == bi){
 								data_inuse_in = 1;
+								break;
+								
 							}
 							indir++;
 						}
 					}
-				}
 
+				}
+				di++;
+			}
+			int data_ok = data_inuse || data_inuse_in;
+
+			if(!data_ok){
+				fprintf(stderr,"ERROR: bitmap marks block in use but it is not in use.\n");
+				exit(1);
 
 			}
+
 	
 		}
-
+		
 	}
 
 
-	int data_ok = data_inuse || data_inuse_in;
+	//#7 & #8
+	di = (struct dinode*) (img_ptr + (2*BSIZE));
+		
+	for(i = 0; i<sb->ninodes; i++){
+		if((di->type == T_DIR) || (di->type == T_FILE) || (di->type == T_DEV)){
+			for(int j = 0; j<NDIRECT+1; j++){
+				if(di->addrs[j] != 0){
+					
+					duplicate_dir_address(di->addrs[j], img_ptr, sb, di);
 
-	if(!data_ok){
-		fprintf(stderr,"ERROR: bitmap marks block in use but it is not in use.\n");
-		exit(1);
+				}
+			}
 
+			if(di->addrs[NDIRECT] !=0){
+				
+				uint* indir = (uint*) (img_ptr + (di->addrs[NDIRECT]*BSIZE));
+				for(int z = 0; z< NINDIRECT; z++){
+					duplicate_indir_address(*indir, img_ptr, sb, di);
+					indir++;
+				}
+				
+			}			
+		}
+		di++;
 	}
 
+
+	//#9
+	di = (struct dinode*) (img_ptr + (2*BSIZE));
+	int in_dir;
+	di++;
+	di++;
+	//skipping root
+	for(i = 2; i< sb->ninodes; i++){
+		in_dir = 0;
+		if((di->type == T_DIR) || (di->type == T_FILE) || (di->type == T_DEV)){
+			
+			struct dinode* dir = (struct dinode*) (img_ptr+2*BSIZE);			
+			for(int k = 0; k < sb->ninodes; k++){
+				if(dir->type == T_DIR){
+					for(int j = 0; j<NDIRECT; j++){					
+						struct dirent* dre = (struct dirent*) (img_ptr+dir->addrs[j]*BSIZE);
+						// skipping . and ..
+						dre++;
+						dre++;
+						for(int y = 0; y< DPB; y++){
+							if(dre->inum == i){
+								in_dir =1;
+								break;
+							}
+							dre++;
+						}
+					}
+					if(dir->addrs[NDIRECT] != 0){
+						uint * indir = (uint*) (img_ptr + dir->addrs[NDIRECT] *BSIZE);
+						for(int z=0; z<NINDIRECT; z++){
+							struct dirent* dre = (struct dirent*) (img_ptr + (*indir*BSIZE));
+														
+							for(int y = 0; y<DPB; y++){
+								if(dre->inum == i){
+									in_dir = 1;
+									break;
+								}
+								dre++;
+							}
+
+							indir++;
+						}
+			
+					}
+				}
+			dir++;
+
+			}
+			if(!in_dir){
+				fprintf(stderr, "ERROR: inode marked use but not found in a directory.\n");
+				exit(1);
+			}
+		}
+
+		
+
+		di++;
+	}
 	
+
+	//#10
+/*
+	di = (struct dinode*) (img_ptr + (2*BSIZE));
+	for(i = 0; i< sb->ninodes; i++){
+		if(di->type == T_DIR){		
+			for(int j=0; j<NDIRECT; j++){
+				struct dirent* dre = (struct dirent*) (img_ptr + di->addrs[j]*BSIZE);
+
+				for(int z = 0; z< DPB; z++){
+					int inode_num = dre->inum;
+					if(inode_num != 0){
+						struct dinode* di2 = (struct dinode*) (img_ptr + (IBLOCK(inode_num)*BSIZE));
+						di2 = di2 + inode_num;
+						printf("inode number: %d. Block inode is in: %lu. Inode type: %d. directory entry name %s\n", inode_num, IBLOCK(inode_num), di2->type, dre->name);
+						if(di2->type == 0){
+							//fprintf(stderr, "ERROR: inode referred to in directory but marked free.\n");
+							//exit(1);
+						}
+					}
+					dre++;
+
+				}
+			}
+
+			if(di->addrs[NDIRECT] !=0){
+				uint* indir = (uint*) (img_ptr + (di->addrs[NDIRECT] * BSIZE));
+				for(int k = 0; k<NINDIRECT; k++){
+					struct dirent* dre = (struct dirent*) (img_ptr + (*indir*BSIZE));
+					for(int g =0; g<DPB; g++){
+						int inode_num = dre->inum;
+						if(inode_num != 0){
+							struct dinode* di2 = (struct dinode*) (img_ptr + (IBLOCK(inode_num)*BSIZE));
+							di2 = di2 + inode_num;
+							//printf("INDIRECT: inode number: %d. Block inode is in: %lu. Inode type: %d.\n", inode_num, IBLOCK(inode_num), di2->type);
+							if(di2->type == 0){
+								//fprintf(stderr, "ERROR: inode referred to in directory but marked free.\n");
+								//exit(1);
+							}
+						}
+						dre++;
+					}					
+					
+					indir++;
+				}
+
+			}
+		}
+		printf("ACTUAL: inode num :%d, block inode is in: %lu, inode type: %d\n", i , IBLOCK(i), di->type);
+		di++;
+	}
+
+
 	
+
+
+*/
+
+
+
+
+
+
+
+
+
+
+
 
 }

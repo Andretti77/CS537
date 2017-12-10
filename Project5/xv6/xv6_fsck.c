@@ -83,6 +83,109 @@ void duplicate_indir_address(uint addrs, void* img_ptr, struct superblock* sb,st
 
 }
 
+void check_directory_link(short nlink, void* img_ptr, struct superblock* sb, int inode_num){
+	short curr_link = 0;	
+	struct dinode* di2 = (struct dinode*) (img_ptr + (2*BSIZE));
+	for(int i = 0; i<sb->ninodes; i++){
+		if(di2->type == T_DIR){
+			for(int j = 0; j<NDIRECT; j++){
+				if(di2->addrs[j] !=0){
+					struct dirent* dre = (struct dirent*)(img_ptr + (di2->addrs[j] *BSIZE));
+					for(int z = 0; z<DPB; z++){
+						if(dre->inum == inode_num){
+							curr_link++;
+						}
+						dre++;
+					}
+
+				}
+			}
+			
+			if(di2->addrs[NDIRECT] != 0){
+				uint* indir = (uint*) (img_ptr + (di2->addrs[NDIRECT] *BSIZE));
+				for(int k = 0; k<NINDIRECT; k++){
+					if(*indir != 0){
+						struct dirent* dre = (struct dirent*) (img_ptr + (*indir * BSIZE));
+						for(int y = 0; y<DPB; y++){
+							if(dre->inum == inode_num){
+								curr_link++;
+							}		
+							dre++;
+						}
+					}
+					indir++;
+				}
+
+			}
+
+		}
+
+		di2++;
+	}
+
+	if(curr_link != nlink){
+		fprintf(stderr, "ERROR: bad reference count for file.\n");
+		exit(1);
+
+	}
+
+}
+
+
+void check_multi_dir_ref(void* img_ptr, struct superblock* sb, int inode_num){
+
+	short curr_link = 0;	
+	struct dinode* di2 = (struct dinode*) (img_ptr + (2*BSIZE));
+	for(int i = 0; i<sb->ninodes; i++){
+		if(di2->type == T_DIR){
+			for(int j = 0; j<NDIRECT; j++){
+				if(di2->addrs[j] !=0){
+					struct dirent* dre = (struct dirent*)(img_ptr + (di2->addrs[j] *BSIZE));
+					//skipping . and ..					
+					dre++;
+					dre++;
+					for(int z = 2; z<DPB; z++){
+						if(dre->inum == inode_num){
+							curr_link++;
+						}
+						dre++;
+					}
+
+				}
+			}
+			
+			if(di2->addrs[NDIRECT] != 0){
+				uint* indir = (uint*) (img_ptr + (di2->addrs[NDIRECT] *BSIZE));
+				for(int k = 0; k<NINDIRECT; k++){
+					if(*indir != 0){
+						struct dirent* dre = (struct dirent*) (img_ptr + (*indir * BSIZE));
+						for(int y = 0; y<DPB; y++){
+							if(dre->inum == inode_num){
+								curr_link++;
+							}		
+							dre++;
+						}
+					}
+					indir++;
+				}
+
+			}
+
+		}
+
+		di2++;
+	}
+
+	if(curr_link >1){
+		fprintf(stderr, "ERROR: directory appears more than once in file system.\n");
+		exit(1);
+
+	}
+
+
+
+
+}
 int main(int argc, char* argv[]){
 
 
@@ -433,7 +536,9 @@ int main(int argc, char* argv[]){
 					int inode_num = dre->inum;
 					if(inode_num != 0){
 						struct dinode* di2 = (struct dinode*) (img_ptr + (IBLOCK(inode_num)*BSIZE));
-						di2 = di2 + inode_num;
+						for(int a = 0; a<inode_num; a++){						
+								di2++;
+						}
 						printf("inode number: %d. Block inode is in: %lu. Inode type: %d. directory entry name %s\n", inode_num, IBLOCK(inode_num), di2->type, dre->name);
 						if(di2->type == 0){
 							//fprintf(stderr, "ERROR: inode referred to in directory but marked free.\n");
@@ -474,17 +579,35 @@ int main(int argc, char* argv[]){
 
 
 	
-
-
 */
 
 
 
 
+	//#11
+
+	di = (struct dinode*) (img_ptr + (2*BSIZE));
+	for(i = 0; i<sb->ninodes; i++){
+		if(di->type == T_FILE){
+			check_directory_link(di->nlink, img_ptr, sb,i);			
+
+		}
+		
+		di++;
+	}
 
 
+	//#12
 
+	di = (struct dinode*) (img_ptr + (2*BSIZE));
+	for(i = 0; i<sb->ninodes; i++){
+		if(di->type == T_DIR){
+			check_multi_dir_ref(img_ptr, sb,i);			
 
+		}
+		
+		di++;
+	}
 
 
 
